@@ -1,0 +1,17 @@
+var a = 10101010, b = 3;
+fn myfn(arg1, arg2){
+    a = arg1;
+    b = arg2;
+}
+
+myfn(4, 0);
+
+if(a > b){
+    myfn(29, 28);
+}
+else if(b < a){
+    myfn(43);
+}
+else{
+    myfn(0);
+}

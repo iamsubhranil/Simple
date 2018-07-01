@@ -1,0 +1,13 @@
+How do i know if a variable is a constant?
+A variable is constant if it is declared in the present scope,
+and is currently assigned to a constant (assignment statements are important).
+A variable will be considered being assigned to a constant if
+1. It is assigned to a number/boolean
+2. It is assigned to a constant expression
+
+If we want to optimize after completing parsing the whole source, which seems
+to be the natural choice, then we have to maintain a dictionary containing
+the state of the variable at various lines in the source file.
+
+We can't really tell whether a variable declared in an outer scope
+is constant or not.

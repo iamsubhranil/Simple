@@ -1,0 +1,15 @@
+var n = 10000, i = 2;
+while (i < n/2){
+    var j = n/i;
+    if (n == j*i){
+        var divisor = i, k = 2, isprime = true;
+        while(k < i/2){
+            var l = i / k;
+            if(i == l*k){
+                isprime = false;
+            }
+            k = k + 1;
+        }
+    }
+    j = j + 1;
+}
