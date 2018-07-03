@@ -6,4 +6,11 @@
 3. Generation of basic blocks from the three address code (Done)
 4. Creating CFG from basic blocks (Done)
 5. Performing optimizations
+    1. Constant folding using reaching definitions (done)
+    2. Copy propagation using reaching definitions (done)
+    3. Common subexpression elimination using available expressions (done)
+    4. Dead code elimination using liveness analysis
+    5. Loop invariant code motion
+    6. Peephole optimizations (Strength reduction)
+    7. Loop unrolling
 6. No function calls, no objects until all goals are completed

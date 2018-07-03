@@ -348,7 +348,10 @@ def entry_point(argv):
 
         optimization("Common Subexpression Elimination", 1, cfg, basic_blocks, lambda x : x.eliminate_cse())
         optimization("Copy propagation", 2, cfg, basic_blocks, lambda x : x.propagate_copy())
-        optimization("Constant Folding", 1, cfg, basic_blocks, lambda x : x.fold_constants())
+        optimization("Constant Folding", 3, cfg, basic_blocks, lambda x : x.fold_constants())
+        # Some expressions can still be optimized after performing a different optimization
+        # What is the correct order of optimization then?
+        #optimization("Common Subexpression Elimination", 4, cfg, basic_blocks, lambda x : x.eliminate_cse())
     except ParseError as e:
         disp("\n\n")
         if we_are_translated():
