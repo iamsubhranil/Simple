@@ -1,8 +1,0 @@
-fn fibo(arg1){
-    if arg1 < 2 {
-        ret 1;
-    }
-    ret fibo(arg1 - 2) + fibo(arg1 - 1);
-}
-
-var a = fibo(10);

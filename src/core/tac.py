@@ -24,6 +24,11 @@ class Atom(object):
     def propagate_copy(self, inset):
         print "Override this"
 
+    # Returns true if the expression
+    # contains the variable
+    def contains(self, sid):
+        print "Override this"
+
 class Var(Atom):
 
     def __init__(self, sid):
@@ -53,7 +58,7 @@ class Var(Atom):
     def fold_constants(self, inset):
         res = self.find_only_definition(inset)
         if res is not None and isinstance(res, Const):
-            print "Found only def of (", self, ") at (", res, ")"
+            #print "Found only def of (", self, ") at (", res, ")"
             return res.value
         return None
 
@@ -70,6 +75,12 @@ class Var(Atom):
                 if v is not None: # y is only defined once, hence return directly
                     return res
         return self
+
+    def contains(self, sid):
+        return self.sid == sid
+
+    def __eq__(self, other):
+        return isinstance(other, Var) and self.sid == other.sid
 
 class Const(Atom):
 
@@ -88,6 +99,12 @@ class Const(Atom):
 
     def propagate_copy(self, inset):
         return self
+
+    def contains(self, sid):
+        return False
+
+    def __eq__(self, other):
+        return isinstance(other, Const) and self.value == other.value
 
 class AtomicOp(Atom):
 
@@ -124,6 +141,22 @@ class UnOp(AtomicOp):
     def propagate_copy(self, inset):
         if isinstance(self.right, Var):
             self.right = self.right.propagate_copy(inset)
+        return self
+
+    def contains(self, sid):
+        return self.right.contains(sid)
+
+    def __eq__(self, other):
+        if isinstance(other, UnOp):
+            m = self.op == other.op
+            r = self.right == other.right
+            return m and r
+        return False
+
+    def get_replacement(self, inavailset):
+        for i in inavailset:
+            if i.rhs == self:
+                return i.lhs
         return self
 
 def func_gt(x, y):
@@ -195,6 +228,13 @@ class BinOp(AtomicOp):
     def fold_constants(self, inset):
         lval = self.left.fold_constants(inset)
         rval = self.right.fold_constants(inset)
+        # Although we may not be able to calculate
+        # the whole expression, we can replace
+        # parts of it easily
+        if lval is not None:
+            self.left = Const(lval)
+        if rval is not None:
+            self.right = Const(rval)
         if lval is not None and rval is not None:
             return self.function[self.op](lval, rval)
         return None
@@ -204,6 +244,24 @@ class BinOp(AtomicOp):
             self.left = self.left.propagate_copy(inset)
         if isinstance(self.right, Var):
             self.right = self.right.propagate_copy(inset)
+        return self
+
+    def contains(self, sid):
+        return self.right.contains(sid) or self.left.contains(sid)
+
+    def __eq__(self, other):
+        if isinstance(other, BinOp):
+            l = self.left == other.left
+            m = self.op == other.op
+            r = self.right == other.right
+            return l and m and r
+        return False
+
+    def get_replacement(self, inavailset):
+        assert isinstance(inavailset, set)
+        for i in inavailset:
+            if i.rhs == self:
+                return i.lhs
         return self
 
 class Tac(object):
@@ -327,3 +385,11 @@ class Tac(object):
     def propagate_copy(self, inset):
         if self.rhs is not None:
             self.rhs = self.rhs.propagate_copy(inset)
+
+    def eliminate_cse(self, inavailset):
+        if self.rhs is not None:
+            if isinstance(self.rhs, BinOp) \
+                    or isinstance(self.rhs, UnOp):
+                tmp = self.rhs.get_replacement(inavailset)
+                if tmp != self.lhs:
+                    self.rhs = tmp

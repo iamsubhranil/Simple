@@ -5,7 +5,7 @@ from rpython.rlib.parsing.lexer import *
 from lexpar import parser, lexer, KoolToAST
 from strtbl import get_string, register_string
 from simplenodes import *
-from simplecfg import find_basic_blocks, bb_to_cfg, print_cfg, view_cfg, find_reaching_definitions
+from simplecfg import find_basic_blocks, bb_to_cfg, print_cfg, view_cfg, find_reaching_definitions, find_available_expressions
 
 def disp(s):
     print s,
@@ -338,10 +338,17 @@ def entry_point(argv):
         print "====================="
         find_reaching_definitions(cfg, basic_blocks)
         for bb in basic_blocks:
-            print bb, "Inset : ", bb.inset
+            print bb, "Inset : ", bb.inreachset
 
-        optimization("Constant Folding", 1, cfg, basic_blocks, lambda x : x.fold_constants())
+        print "\nAvailable expressions"
+        print "======================"
+        find_available_expressions(cfg, basic_blocks)
+        for bb in basic_blocks:
+            print bb, "Avail" + str(bb.inavailset)
+
+        optimization("Common Subexpression Elimination", 1, cfg, basic_blocks, lambda x : x.eliminate_cse())
         optimization("Copy propagation", 2, cfg, basic_blocks, lambda x : x.propagate_copy())
+        optimization("Constant Folding", 1, cfg, basic_blocks, lambda x : x.fold_constants())
     except ParseError as e:
         disp("\n\n")
         if we_are_translated():

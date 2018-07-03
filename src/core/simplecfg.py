@@ -114,10 +114,10 @@ def print_cfg(cfg, basic_blocks):
         print "\n"
         k = k + 1
 
-def view_cfg(cfg, basic_blocks):
+def view_cfg(cfg, basic_blocks, name = "CFG"):
     from dotviewer import graphclient
     import py
-    content = ["digraph G{"]
+    content = ['digraph '+ name + '{']
     i = 0
     for blk in cfg:
         s = '"%s" [label="%s"];\n' % (i, basic_blocks[i].get_label())
@@ -161,14 +161,42 @@ def find_reaching_definitions(cfg, basic_blocks):
             prevout = out[basic_blocks[i]]
             j = 0
             inbb = set()
-            while j < len(basic_blocks):
+            while j < len(basic_blocks): # Also consider successors since loop is natural
                 if cfg[j][i] != 'None':
-                    #print "Out : ", basic_blocks[j].calculate_out()
-                    inbb = inbb.union(basic_blocks[j].calculate_out())
+                    #print "Out : ", basic_blocks[j].calculate_reaching_defs()
+                    inbb = inbb.union(basic_blocks[j].calculate_reaching_defs())
                     #print "In : ", inbb
                 j = j + 1
-            basic_blocks[i].inset = inbb
-            newout = basic_blocks[i].calculate_out()
+            basic_blocks[i].inreachset = inbb
+            newout = basic_blocks[i].calculate_reaching_defs()
+            if newout != prevout:
+                out[basic_blocks[i]] = newout
+                changed = True
+                break
+            i = i + 1
+
+def find_available_expressions(cfg, basic_blocks):
+    out = {}
+    for bb in basic_blocks:
+        out[bb] = None
+
+    changed = True
+    while changed:
+        changed = False
+        i = 0
+        while i < len(basic_blocks):
+            prevout = out[basic_blocks[i]]
+            j = 0
+            inbb = set()
+            while j < i: # Only consider predecessors
+                if cfg[j][i] != 'None':
+                    #print basic_blocks[i], basic_blocks[j]
+                    #print "Out : ", basic_blocks[j].calculate_avail()
+                    inbb = inbb.union(basic_blocks[j].calculate_avail())
+                    #print "In : ", inbb
+                j = j + 1
+            basic_blocks[i].inavailset = inbb
+            newout = basic_blocks[i].calculate_avail()
             if newout != prevout:
                 out[basic_blocks[i]] = newout
                 changed = True
@@ -193,23 +221,30 @@ class BasicBlock(object):
         self.viewed = 0
         # The set of input definitions
         # to the block, a set of tacs
-        self.inset = None
+        self.inreachset = None
         # The dict of set of input 
         # definitions of each 
         # instruction of the
         # block, to provide more
         # fine grained optimization
         # at instruction level
-        self.ininsset = {}
+        self.insreachset = {}
+        # The set of expressions available
+        # to the block as input
+        self.inavailset = None
+        # The dict of set of expressions
+        # available to each instruction
+        # of the block
+        self.insavailset = {}
 
     def __repr__(self):
         s = 'BasicBlock : {\n'
         for i in self.instructions:
             s = s + str(i)
-            try:
-                s = s + ' in' + str(self.ininsset[i])
-            except KeyError:
-                pass
+            #try:
+            #    s = s + ' in' + str(self.insreachset[i])
+            #except KeyError:
+            #    pass
             s = s + '\n'
         s = s + '\n}'
         return s
@@ -231,32 +266,55 @@ class BasicBlock(object):
                 for line in i.view():
                     yield line
 
-    def calculate_out(self):
-        if self.inset is None:
+    def calculate_reaching_defs(self):
+        if self.inreachset is None:
             return set()
         kill = set()
         gen = set()
-        prevout = self.inset
+        prevout = self.inreachset
         for i in self.instructions:
-            if i.lhs is not None:
+            if i.lhs is not None: # An assignment expression
                 var_def = i.lhs
-                for j in self.inset:
+                for j in self.inreachset:
                     if j.lhs.sid == var_def.sid:
                         kill.add(j)
                 gen.add(i)
-            self.ininsset[i] = prevout
-            prevout = gen.union(self.inset.difference(kill))
+            self.insreachset[i] = prevout
+            prevout = gen.union(prevout.difference(kill))
         #print "Gen : ", gen
-        out = gen.union(self.inset.difference(kill))
+        #out = gen.union(self.inset.difference(kill))
         #print "Out : ", out
         #print self.inset, gen, kill, out
-        return out
+        return prevout
 
     def fold_constants(self):
         for i in self.instructions:
             print i
-            i.fold_constants(self.ininsset[i])
+            i.fold_constants(self.insreachset[i])
 
     def propagate_copy(self):
         for i in self.instructions:
-            i.propagate_copy(self.ininsset[i])
+            i.propagate_copy(self.insreachset[i])
+
+    def calculate_avail(self):
+        if self.inavailset is None:
+            return set()
+        kill = set()
+        gen = set()
+        prevavail = self.inavailset
+        for i in self.instructions:
+            if i.lhs is not None: # Assignment expression
+                gen.add(i)
+                defined = i.lhs
+                for j in prevavail:
+                    if j.rhs.contains(defined.sid):
+                        kill.add(j)
+            self.insavailset[i] = prevavail
+            prevavail = gen.union(prevavail.difference(kill))
+
+        return prevavail
+
+    def eliminate_cse(self):
+        for i in self.instructions:
+            print i, self.insavailset[i]
+            i.eliminate_cse(self.insavailset[i])
