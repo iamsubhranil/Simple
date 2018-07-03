@@ -18,9 +18,12 @@ def check_if_bool(expr):
 def ins_append(i):
     global pending_labels
     for label in pending_labels:
-        print label
+        #print label
         i.targetof[label[1]] = label[0]
-        label[1].destination_ins = i
+        if len(label) == 3:
+            label[1].else_destination_ins = i
+        else:
+            label[1].destination_ins = i
     pending_labels = []
     instructions.append(i)
 
@@ -140,12 +143,14 @@ class Program(Statement):
         self.name = 'Program'
         self.context = context
         self.statements = []
+        self.instructions = []
 
     def compile(self):
         for st in self.statements:
             st.compile()
         if len(pending_labels) > 0:
             ins_append(Tac())
+        self.instructions = instructions
 
     def optimize(self):
         for st in self.statements:
@@ -250,22 +255,38 @@ class IfStatement(Statement):
     def compile(self):
         t = self.cond.compile()
         l = get_temp_label()
-        countercond = UnOp(t, '!')
+        l2 = get_temp_label()
+        # Generate conditional jump
         tac = Tac()
-        tac.destination = l
-        tac.rhs = countercond
-        ins_append(tac)
-        self.thenpart.compile()
-        if self.elsepart is not None:
-            l1 = get_temp_label()
-            tac1 = Tac()
-            tac1.destination = l1
-            ins_append(tac1)
-            pending_labels.append((l, tac))
-            self.elsepart.compile()
-            pending_labels.append((l1, tac1))
-        else:
-            pending_labels.append((l, tac))
+        tac.destination = l2                        # --------|
+        tac.else_destination = l                    # -----|  |
+        tac.rhs = t                                 #      |  | ThenBlock
+        ins_append(tac)                             #      |  |
+        # Compile then block labelled by l2         #      |  |
+        pending_labels.append((l2, tac))            #      |  |
+        self.thenpart.compile()                     # <----+--|
+        # Check if there is any explicit else block #      |
+        if self.elsepart is not None:               #      |
+            # Generate unconditional jump           #      |
+            # to the end of the chain if            #      |
+            # the then block was taken              #      |
+            l1 = get_temp_label()                   #      |
+            tac1 = Tac()                            #      |
+            tac1.destination = l1                   #      | ElseBlock
+            ins_append(tac1)                        #      |
+            # Label the else block with l           #      |
+            # so that when the condition is         #      |
+            # false, it is taken                    #      |
+            pending_labels.append((l, tac, True))   #      |
+            self.elsepart.compile()                 # <----|
+            # Set l1 as the label to the end        #      |
+            # of the chain                          #      |
+            pending_labels.append((l1, tac1))       #      |
+        else:                                       #      |
+            # There is no else block, so jump       #      |
+            # out of the block when the then        #      |
+            # block is taken                        #      |
+            pending_labels.append((l, tac, True))   # <----|
 
     def __repr__(self):
         s = 'if ' + str(self.cond) + '{\n' + str(self.thenpart) + '\n}'
@@ -294,19 +315,33 @@ class WhileStatement(Statement):
 
     def compile(self):
         l = get_temp_label()
+        l2 = get_temp_label()
+        # Generate, but don't append yet
+        # the unconditional jump to the
+        # start of the block
         ujmp = Tac()
-        pending_labels.append((l, ujmp))
-        t = self.cond.compile()
-        l1 = get_temp_label()
-        countercond = UnOp(t, '!')
-        cjmp = Tac()
-        cjmp.destination = l1
-        cjmp.rhs = countercond
-        ins_append(cjmp)
-        self.truestatement.compile()
         ujmp.destination = l
-        ins_append(ujmp)
-        pending_labels.append((l1, cjmp))
+        # Mark the condition with label l
+        pending_labels.append((l, ujmp))            #
+        t = self.cond.compile()                     # <---------|
+        l1 = get_temp_label()                       #           |
+        # Generate the conditional jump             #           |
+        # either to the then block or               #           |
+        # out of the loop                           #           |
+        cjmp = Tac()                                #           |
+        cjmp.destination = l1                       # ----|     | Cond Reeval.
+        cjmp.else_destination = l2                  # ----+-|   |
+        cjmp.rhs = t                                #     | |   |
+        ins_append(cjmp)                            #     | |   |
+        # Mark the start of the then block          #     | |   |
+        # with l1                                   #     | |   |
+        pending_labels.append((l1, cjmp))           #     | |   |
+        self.truestatement.compile()                # <---| |   |
+        # Now append the unconditional jump         #       |   |
+        # to the loop header we generated earlier   #       |   |
+        ins_append(ujmp)                            # ------+---|
+        # Mark the end of the loop with l2          #       | Jump to end
+        pending_labels.append((l2, cjmp, True))     # <-----|
 
     def __repr__(self):
         s = 'while ' + str(self.cond) + '{\n' + str(self.truestatement) + '\n}'

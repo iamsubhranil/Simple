@@ -1,0 +1,8 @@
+var i = 2, j = 3;
+while (i != j){
+   if (i < j){
+        i = i + 2;
+   } 
+   else
+        j = j + 2;
+}

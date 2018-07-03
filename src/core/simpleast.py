@@ -5,7 +5,7 @@ from rpython.rlib.parsing.lexer import *
 from lexpar import parser, lexer, KoolToAST
 from strtbl import get_string, register_string
 from simplenodes import *
-from simplecfg import basic_blocks, find_basic_blocks, bb_to_cfg, view_cfg
+from simplecfg import find_basic_blocks, bb_to_cfg, view_cfg, find_reaching_definitions
 
 def disp(s):
     print s,
@@ -276,7 +276,7 @@ class KoolAstGen(object):
 def entry_point(argv):
     # parser, lexer, transformer = make_kool_parser()
     disp("Initializing..\n")
-    f = open("test/expression.kool", "r")
+    f = open(argv[1], "r")
     source = f.read()
     tokens = lexer.tokenize(source, True)
     if not we_are_translated():
@@ -300,14 +300,42 @@ def entry_point(argv):
         program = cg.visit_program(res)
         program.validate()
         print "\n\n"
+        print "Restructured program"
+        print "====================\n"
         print program
         program.compile()
-        for i in instructions:
+        print "Generated instructions"
+        print "======================\n"
+        for i in program.instructions:
             print i
-        find_basic_blocks()
+        basic_blocks = find_basic_blocks(program.instructions)
+        print "\nBasic blocks"
+        print "=============\n"
         print basic_blocks
-        bb_to_cfg()
-        view_cfg()
+        cfg = bb_to_cfg(basic_blocks)
+        print "\nCFG (adjacency matrix)"
+        print "=======================\n"
+        print " " * 4,
+        for i in range(len(basic_blocks)):
+            print "%-4d" % i,
+        print
+        k = 0
+        for i in cfg:
+            print "%-4d" % k,
+            for j in i:
+                if j == 'None':
+                    j = '--'
+                elif j == ' ' or j == 'else':
+                    j = '->'
+                print "%-4s" % j,
+            print "\n"
+            k = k + 1
+        view_cfg(cfg, basic_blocks)
+        print "\nReaching definitions"
+        print "====================="
+        find_reaching_definitions(cfg, basic_blocks)
+        for bb in basic_blocks:
+            print bb, "Inset : ", bb.inset
     except ParseError as e:
         disp("\n\n")
         if we_are_translated():
@@ -319,7 +347,8 @@ def entry_point(argv):
 
 def target(driver, args):
     driver.exe_name = 'kool-%(backend)s'
-    return entry_point, None
+    return entry_point, args
 
 if __name__ == '__main__':
-    entry_point(None)
+    import sys
+    entry_point(sys.argv)

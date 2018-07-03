@@ -1,0 +1,11 @@
+var i = 3, j = 2;
+
+if i < 3 {
+    var a = 4;
+}
+else if i < j{
+    var b = 6;
+}
+else{
+    var c = 7;
+}
