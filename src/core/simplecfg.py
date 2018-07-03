@@ -59,7 +59,6 @@ def bb_to_cfg(basic_blocks):
     cfg = [None] * len(basic_blocks)
     while i < len(basic_blocks):
         x = basic_blocks[i].instructions[-1]
-        print x
         cfg[i] = ['None'] * len(basic_blocks)
         if x.is_branch():
             ins = x.destination_ins
@@ -78,6 +77,7 @@ def bb_to_cfg(basic_blocks):
                     basic_blocks[i].destinations.append(basic_blocks[j])
                     break
                 j = j + 1
+            # Same for else inst
             j = 0
             while j < len(basic_blocks):
                 if eins in basic_blocks[j].instructions:
@@ -93,9 +93,26 @@ def bb_to_cfg(basic_blocks):
                 #    lbl = 'else'
                 cfg[i][i + 1] = lbl
                 basic_blocks[i + 1].targetof[basic_blocks[i]] = lbl
-                basic_blocks[i].destinations.append(basic_blocks[i + 1])
+                basic_blocks[i].destinations.append(basic_blocks[i + 1]) # Auto append the next block
         i = i + 1
     return cfg
+
+def print_cfg(cfg, basic_blocks):
+    print " " * 4,
+    for i in range(len(basic_blocks)):
+        print "%-4d" % i,
+    print
+    k = 0
+    for i in cfg:
+        print "%-4d" % k,
+        for j in i:
+            if j == 'None':
+                j = '--'
+            elif j == ' ' or j == 'else':
+                j = '->'
+            print "%-4s" % j,
+        print "\n"
+        k = k + 1
 
 def view_cfg(cfg, basic_blocks):
     from dotviewer import graphclient
@@ -234,4 +251,8 @@ class BasicBlock(object):
         #print "Out : ", out
         #print self.inset, gen, kill, out
         return out
+
+    def fold_constants(self):
+        for i in self.instructions:
+            i.fold_constants(self.ininsset[i])
 

@@ -13,7 +13,7 @@ class Atom(object):
     # or None if the atom can not be
     # evaluated due to multiple
     # reaching definitions
-    def eval(self, inset):
+    def fold_constants(self, inset):
         print "Override this"
 
 class Var(Atom):
@@ -28,7 +28,7 @@ class Var(Atom):
     def nocolor(self):
         return str(self)
 
-    def eval(self, inset):
+    def fold_constants(self, inset):
         assert isinstance(inset, set)
         i = 0
         res = None
@@ -39,7 +39,9 @@ class Var(Atom):
                     res = None
                     break
                 i = i + 1
-                res = rhs.eval()
+                res  = expr.rhs
+        if res is not None:
+            return res.fold_constants(inset)
         return res
 
 class Const(Atom):
@@ -54,7 +56,7 @@ class Const(Atom):
     def nocolor(self):
         return str(self)
 
-    def eval(self, inset):
+    def fold_constants(self, inset):
         return self.value
 
 class AtomicOp(Atom):
@@ -83,8 +85,8 @@ class UnOp(AtomicOp):
     def nocolor(self):
         return str(self.op) + ' ' + self.right.nocolor()
 
-    def eval(self, inset):
-        val = self.right.eval()
+    def fold_constants(self, inset):
+        val = self.right.fold_constants()
         if val is not None:
             return self.function[self.op](val)
         return None
@@ -155,9 +157,9 @@ class BinOp(AtomicOp):
     def nocolor(self):
         return self.left.nocolor() + ' ' + str(self.op) + ' ' + self.right.nocolor()
 
-    def eval(self, inset):
-        lval = self.left.eval(inset)
-        rval = self.right.eval(inset)
+    def fold_constants(self, inset):
+        lval = self.left.fold_constants(inset)
+        rval = self.right.fold_constants(inset)
         if lval is not None and rval is not None:
             return self.function[self.op](lval, rval)
         return None
@@ -263,13 +265,19 @@ class Tac(object):
             return True
         return False
 
-    def optimize(self, inset):
+    # Tries to fold the constants in the instructions
+    # and updates the instruction if necessary
+    def fold_constants(self, inset):
         if self.lhs is not None: # assignment
-            val = self.rhs.eval(inset)
+            val = self.rhs.fold_constants(inset)
             if val is not None:
                 self.rhs = Const(val)
         elif self.rhs is not None: # conditional jump
-            val = self.rhs.eval(inset)
+            val = self.rhs.fold_constants(inset)
             if val is not None:
                 if val is True: # condition is always true
+                    self.rhs = None # make it unconditional
+                elif val is False: # condition is always false
+                    self.destination = self.else_destination # Make the else block as the destination
+                    self.destination_ins = self.else_destination_ins
                     self.rhs = None # make it unconditional

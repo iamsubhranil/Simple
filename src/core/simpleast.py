@@ -5,7 +5,7 @@ from rpython.rlib.parsing.lexer import *
 from lexpar import parser, lexer, KoolToAST
 from strtbl import get_string, register_string
 from simplenodes import *
-from simplecfg import find_basic_blocks, bb_to_cfg, view_cfg, find_reaching_definitions
+from simplecfg import find_basic_blocks, bb_to_cfg, print_cfg, view_cfg, find_reaching_definitions
 
 def disp(s):
     print s,
@@ -315,27 +315,30 @@ def entry_point(argv):
         cfg = bb_to_cfg(basic_blocks)
         print "\nCFG (adjacency matrix)"
         print "=======================\n"
-        print " " * 4,
-        for i in range(len(basic_blocks)):
-            print "%-4d" % i,
-        print
-        k = 0
-        for i in cfg:
-            print "%-4d" % k,
-            for j in i:
-                if j == 'None':
-                    j = '--'
-                elif j == ' ' or j == 'else':
-                    j = '->'
-                print "%-4s" % j,
-            print "\n"
-            k = k + 1
+        print_cfg(cfg, basic_blocks)
         view_cfg(cfg, basic_blocks)
         print "\nReaching definitions"
         print "====================="
         find_reaching_definitions(cfg, basic_blocks)
         for bb in basic_blocks:
             print bb, "Inset : ", bb.inset
+
+        print "\nOptimization (Phase 1)"
+        print "=======================\n"
+        print "Folding constants"
+        print "================="
+        for bb in basic_blocks:
+            bb.fold_constants()
+        print "\nAfter folding constants"
+        print "====================\n"
+        print "\nBasic blocks"
+        print "=============\n"
+        print basic_blocks
+        cfg = bb_to_cfg(basic_blocks)
+        print "\nCFG (adjacency matrix)"
+        print "=======================\n"
+        print_cfg(cfg, basic_blocks)
+        view_cfg(cfg, basic_blocks)
     except ParseError as e:
         disp("\n\n")
         if we_are_translated():
