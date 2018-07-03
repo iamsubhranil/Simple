@@ -1,0 +1,6 @@
+var a = 10, b = 20, c = 30, d = 40;
+while (a < d){
+    a = a + 10;
+    b = c + a;
+    var e = b ^ c;
+}

@@ -16,6 +16,14 @@ class Atom(object):
     def fold_constants(self, inset):
         print "Override this"
 
+    # The set of reaching definitions
+    # given as the argument.
+    # The return value will be the
+    # replaced expression if possible,
+    # otherwise the expression itself
+    def propagate_copy(self, inset):
+        print "Override this"
+
 class Var(Atom):
 
     def __init__(self, sid):
@@ -28,7 +36,7 @@ class Var(Atom):
     def nocolor(self):
         return str(self)
 
-    def fold_constants(self, inset):
+    def find_only_definition(self, inset):
         assert isinstance(inset, set)
         i = 0
         res = None
@@ -40,9 +48,28 @@ class Var(Atom):
                     break
                 i = i + 1
                 res  = expr.rhs
-        if res is not None:
-            return res.fold_constants(inset)
         return res
+
+    def fold_constants(self, inset):
+        res = self.find_only_definition(inset)
+        if res is not None and isinstance(res, Const):
+            print "Found only def of (", self, ") at (", res, ")"
+            return res.value
+        return None
+
+    # The set of reaching definitions
+    # given as the argument.
+    # The return value will be the
+    # replaced variable if possible,
+    # otherwise the variable itself
+    def propagate_copy(self, inset):
+        res = self.find_only_definition(inset)
+        if res is not None:
+            if isinstance(res, Var): # The only definition is of the form x = y
+                v = res.find_only_definition(inset) # Try to find the only definition of y
+                if v is not None: # y is only defined once, hence return directly
+                    return res
+        return self
 
 class Const(Atom):
 
@@ -58,6 +85,9 @@ class Const(Atom):
 
     def fold_constants(self, inset):
         return self.value
+
+    def propagate_copy(self, inset):
+        return self
 
 class AtomicOp(Atom):
 
@@ -90,6 +120,11 @@ class UnOp(AtomicOp):
         if val is not None:
             return self.function[self.op](val)
         return None
+
+    def propagate_copy(self, inset):
+        if isinstance(self.right, Var):
+            self.right = self.right.propagate_copy(inset)
+        return self
 
 def func_gt(x, y):
     return x > y
@@ -163,6 +198,13 @@ class BinOp(AtomicOp):
         if lval is not None and rval is not None:
             return self.function[self.op](lval, rval)
         return None
+
+    def propagate_copy(self, inset):
+        if isinstance(self.left, Var):
+            self.left = self.left.propagate_copy(inset)
+        if isinstance(self.right, Var):
+            self.right = self.right.propagate_copy(inset)
+        return self
 
 class Tac(object):
 
@@ -281,3 +323,7 @@ class Tac(object):
                     self.destination = self.else_destination # Make the else block as the destination
                     self.destination_ins = self.else_destination_ins
                     self.rhs = None # make it unconditional
+
+    def propagate_copy(self, inset):
+        if self.rhs is not None:
+            self.rhs = self.rhs.propagate_copy(inset)

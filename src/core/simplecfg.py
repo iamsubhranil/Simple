@@ -254,5 +254,9 @@ class BasicBlock(object):
 
     def fold_constants(self):
         for i in self.instructions:
+            print i
             i.fold_constants(self.ininsset[i])
 
+    def propagate_copy(self):
+        for i in self.instructions:
+            i.propagate_copy(self.ininsset[i])

@@ -272,6 +272,23 @@ class KoolAstGen(object):
     def visit_DECIMAL(self, node):
         return ConstantExpression(self.context, int(node.additional_info), int)
 
+def optimization(name, phase, cfg, basic_blocks, function):
+        print "\nOptimization (Phase ", str(phase) + ")"
+        print "=======================\n"
+        print name
+        print "=" * len(name), "\n"
+        for bb in basic_blocks:
+            function(bb)
+        print "\nAfter", name
+        print "=====", "=" * len(name), "\n"
+        print "\nBasic blocks"
+        print "=============\n"
+        print basic_blocks
+        cfg = bb_to_cfg(basic_blocks)
+        print "\nCFG (adjacency matrix)"
+        print "=======================\n"
+        print_cfg(cfg, basic_blocks)
+        view_cfg(cfg, basic_blocks)
 
 def entry_point(argv):
     # parser, lexer, transformer = make_kool_parser()
@@ -323,22 +340,8 @@ def entry_point(argv):
         for bb in basic_blocks:
             print bb, "Inset : ", bb.inset
 
-        print "\nOptimization (Phase 1)"
-        print "=======================\n"
-        print "Folding constants"
-        print "================="
-        for bb in basic_blocks:
-            bb.fold_constants()
-        print "\nAfter folding constants"
-        print "====================\n"
-        print "\nBasic blocks"
-        print "=============\n"
-        print basic_blocks
-        cfg = bb_to_cfg(basic_blocks)
-        print "\nCFG (adjacency matrix)"
-        print "=======================\n"
-        print_cfg(cfg, basic_blocks)
-        view_cfg(cfg, basic_blocks)
+        optimization("Constant Folding", 1, cfg, basic_blocks, lambda x : x.fold_constants())
+        optimization("Copy propagation", 2, cfg, basic_blocks, lambda x : x.propagate_copy())
     except ParseError as e:
         disp("\n\n")
         if we_are_translated():
