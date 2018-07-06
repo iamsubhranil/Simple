@@ -1,0 +1,8 @@
+var a = 5, b = 6;
+while b > 0{
+    a = 6;
+    b = b - 1;
+}
+while b < 10{
+    b = b + 1;
+}

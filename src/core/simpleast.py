@@ -5,7 +5,10 @@ from rpython.rlib.parsing.lexer import *
 from lexpar import parser, lexer, KoolToAST
 from strtbl import get_string, register_string
 from simplenodes import *
-from simplecfg import find_basic_blocks, bb_to_cfg, print_cfg, view_cfg, find_reaching_definitions, find_available_expressions
+from simplecfg import find_basic_blocks, bb_to_cfg, print_cfg, view_cfg, \
+    find_reaching_definitions, find_available_expressions, \
+    find_dominators, find_back_edges, get_natural_loop, \
+    insert_preheader, optimize_loop_invariants, find_live_variables
 
 def disp(s):
     print s,
@@ -249,7 +252,7 @@ class KoolAstGen(object):
             elif child.symbol == 'number':
                 return self.visit_number(child)
             elif child.symbol == 'TRUE':
-                return ConstantExpression(self.context, False, bool)
+                return ConstantExpression(self.context, True, bool)
             elif child.symbol == 'FALSE':
                 return ConstantExpression(self.context, False, bool)
                 #disp("\nLOAD_SUPER ")
@@ -334,6 +337,37 @@ def entry_point(argv):
         print "=======================\n"
         print_cfg(cfg, basic_blocks)
         view_cfg(cfg, basic_blocks)
+
+        print "\nFinding dominator tree"
+        print "======================="
+        dom = find_dominators(cfg, basic_blocks)
+        i = 0
+        for bb in basic_blocks:
+            print bb, " Dominators :", dom[i]
+            i = i + 1
+
+        print "\nFinding back edges"
+        print "==================="
+        back_edges = find_back_edges(cfg, dom)
+        print back_edges
+        loops = []
+        for be in back_edges:
+            loop = get_natural_loop(cfg, be[0], be[1])
+            print "Loop :", loop
+            loops.append(loop)
+
+        i = 0
+        while i < len(loops):
+            print "\nInitializing loop", i
+            print "===================="
+            basic_blocks, cfg, dom, back_edges, loops = insert_preheader(cfg, basic_blocks, loops, i)
+
+            print "\nAfter Initializing preheder"
+            print "============================"
+            print_cfg(cfg, basic_blocks)
+            view_cfg(cfg, basic_blocks)
+            i = i + 1
+
         print "\nReaching definitions"
         print "====================="
         find_reaching_definitions(cfg, basic_blocks)
@@ -345,6 +379,21 @@ def entry_point(argv):
         find_available_expressions(cfg, basic_blocks)
         for bb in basic_blocks:
             print bb, "Avail" + str(bb.inavailset)
+
+        print "\nLive variables"
+        print "================"
+        find_live_variables(cfg, basic_blocks)
+        for bb in basic_blocks:
+            if bb.outliveset != None:
+                print bb, "LiveOut : {",
+                for i in bb.outliveset:
+                    print get_string(i),
+                print "}"
+
+        for loop in loops:
+            print "\nSearching for loop invariants (loop:", loop, ")"
+            print "=============================="
+            optimize_loop_invariants(cfg, basic_blocks, dom, loop)
 
         optimization("Common Subexpression Elimination", 1, cfg, basic_blocks, lambda x : x.eliminate_cse())
         optimization("Copy propagation", 2, cfg, basic_blocks, lambda x : x.propagate_copy())

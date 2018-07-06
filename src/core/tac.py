@@ -21,12 +21,24 @@ class Atom(object):
     # The return value will be the
     # replaced expression if possible,
     # otherwise the expression itself
-    def propagate_copy(self, inset):
+    def propagate_copy(self, inreachset):
         print "Override this"
 
     # Returns true if the expression
     # contains the variable
     def contains(self, sid):
+        print "Override this"
+
+    # inreachset is the set of reaching definitions
+    # loop is the set of basic blocks comprising
+    # the loop under consideration
+    # Returns true if the variable or expression
+    # is loop invariant
+    def is_loop_invariant(self, inreachset, loop):
+        print "Override this"
+
+    # Returns the set of used variables in the expression
+    def get_used(self):
         print "Override this"
 
 class Var(Atom):
@@ -82,6 +94,28 @@ class Var(Atom):
     def __eq__(self, other):
         return isinstance(other, Var) and self.sid == other.sid
 
+    def is_loop_invariant(self, inreachset, loop):
+        ret = True
+        count = 0
+        inloop = False
+        for vardef in inreachset: # For every reaching definition
+            if vardef.lhs == self:
+                for block in loop: # Search for it in the loop block
+                    if vardef in block.instructions: # There is a definition of the variable inside the loop
+                        inloop = True
+                        if count > 0: # There is more than one definition of it
+                            return False
+                        ret = ret and vardef.rhs.is_loop_invariant(inreachset, loop)
+            count = count + 1
+        if not inloop: # The variable was not defined inside the loop, it is invariant
+            return True
+        elif inloop and count == 1: # It is defined in the loop and that is the only definition
+            return ret
+        return False # None of them holds
+
+    def get_used(self):
+        return set([self.sid])
+
 class Const(Atom):
 
     def __init__(self, value):
@@ -105,6 +139,12 @@ class Const(Atom):
 
     def __eq__(self, other):
         return isinstance(other, Const) and self.value == other.value
+
+    def is_loop_invariant(self, inreachset, loop):
+        return True
+
+    def get_used(self):
+        return set()
 
 class AtomicOp(Atom):
 
@@ -158,6 +198,12 @@ class UnOp(AtomicOp):
             if i.rhs == self:
                 return i.lhs
         return self
+
+    def is_loop_invariant(self, inreachset, loop):
+        return self.right.is_loop_invariant(inreachset, loop)
+
+    def get_used(self):
+        return self.right.get_used()
 
 def func_gt(x, y):
     return x > y
@@ -263,6 +309,12 @@ class BinOp(AtomicOp):
             if i.rhs == self:
                 return i.lhs
         return self
+
+    def is_loop_invariant(self, inreachset, loop):
+        return self.left.is_loop_invariant(inreachset, loop) and self.right.is_loop_invariant(inreachset, loop)
+
+    def get_used(self):
+        return self.left.get_used().union(self.right.get_used())
 
 class Tac(object):
 
@@ -393,3 +445,8 @@ class Tac(object):
                 tmp = self.rhs.get_replacement(inavailset)
                 if tmp != self.lhs:
                     self.rhs = tmp
+
+    def is_loop_invariant(self, inreachset, loop):
+        if self.lhs is not None and self.rhs is not None:
+            return self.rhs.is_loop_invariant(inreachset, loop)
+        return False

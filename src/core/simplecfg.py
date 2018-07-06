@@ -1,4 +1,5 @@
 from tac import Tac
+from simplenodes import get_temp_label
 
 def find_index(instructions):
     def fi(ins):
@@ -204,6 +205,232 @@ def find_available_expressions(cfg, basic_blocks):
             i = i + 1
 
 
+def find_live_variables(cfg, basic_blocks):
+    inset = {}
+
+    for bb in basic_blocks:
+        inset[bb] = None
+
+    changed = True
+    while changed:
+        changed = False
+        i = len(basic_blocks) - 1
+        while i > 0:
+            previn = inset[basic_blocks[i]]
+            j = 0 # Only search for successors
+            outset = set()
+            while j < len(basic_blocks):
+                if cfg[i][j] != 'None':
+                    outset = outset.union(basic_blocks[j].calculate_live_in())
+                j = j + 1
+            basic_blocks[i].outliveset = outset
+            nwin = basic_blocks[i].calculate_live_in()
+            if nwin != previn:
+                inset[basic_blocks[i]] = nwin
+                changed = True
+                #break
+            i = i - 1
+
+def find_dominators(cfg, basic_blocks):
+    lenb = len(basic_blocks)
+    dom = [None] * lenb
+    dom[0] = set()
+    dom[0].add(0)
+    i = 1
+    while i < lenb:
+        dom[i] = set()
+        i = i + 1
+    changed = True
+    while changed:
+        changed = False
+        i = 0
+        while i < lenb:
+            #prev = dom[i]
+            nw = set()
+            nw.add(i)
+            intersect = None
+            j = 0
+            while j < i:
+                if cfg[j][i] != 'None':
+                    if intersect is None:
+                        intersect = dom[j]
+                    else:
+                        intersect = intersect.intersection(dom[j])
+                j = j + 1
+            if intersect is not None:
+                nw = nw.union(intersect)
+            if dom[i] != nw:
+                changed = True
+                dom[i] = nw
+            i = i + 1
+
+    domtree = [None] * lenb
+    i = 0
+    while i < lenb:
+        domtree[i] = ['None'] * lenb
+        dc = set(dom[i])
+        if i == 0:
+            i = i + 1
+            continue
+        dc.remove(i)
+        if i != 0:
+            dc.remove(0)
+        if len(dc) == 0:
+            domtree[0][i] = 1
+        else:
+            domtree[max(dc)][i] = 1
+        i = i + 1
+
+    #print "Domtree :", domtree
+    #view_cfg(domtree, basic_blocks)
+
+    return dom
+
+def find_back_edges(cfg, dom):
+    # A list of tuples
+    back_edges = []
+    i = 0
+    while i < len(cfg):
+        j = 0
+        while j < len(cfg):
+            if cfg[i][j] != 'None':
+                if j in dom[i]:
+                    back_edges.append((j, i))
+            j = j + 1
+        i = i + 1
+    return back_edges
+
+def get_natural_loop(cfg, m, n):
+    """
+    loop = set()
+    stack = []
+    loop.add(m)
+    loop.add(n)
+    stack.append(n)
+    while len(stack) > 0:
+        x = stack.pop()
+        i = 0
+        while i < x:
+            if cfg[i][x] != 'None':
+                if i not in loop:
+                    loop.add(i)
+                    stack.append(i)
+            i = i + 1
+    #return loop
+    """
+    # The back edge is from n -> m
+    print m, n
+    loop = []
+    lc = len(cfg)
+    reachmat = [None] * lc # Reachability matrix
+    i = 0
+    while i < lc:
+        reachmat[i] = [False] * lc
+        if i == m:
+            i = i + 1
+            continue
+        j = 0
+        while j < lc:
+            if cfg[i][j] != 'None' and j != m:
+                reachmat[i][j] = True
+            j = j + 1
+        i = i + 1
+
+    print reachmat
+
+    k = 0
+    while k < lc:
+        i = 0
+        while i < lc:
+            j = 0
+            while j < lc:
+                reachmat[i][j] = reachmat[i][j] or (reachmat[i][k] and reachmat[k][j])
+                j = j + 1
+            i = i + 1
+        k = k + 1
+
+    for row in reachmat:
+        for i in row:
+            if i:
+                print 1,
+            else:
+                print 0,
+        print
+
+    loop.append(m)
+    i = 0
+    while i < lc:
+        if reachmat[i][n]:
+            loop.append(i)
+        i = i + 1
+    loop.append(n)
+    print loop
+    return loop
+
+def insert_preheader(cfg, basic_blocks, loops, idx):
+    # loops is a list of set of indices
+    # This is a very crude approximation,
+    # but the first element is usually
+    # the header
+    hidx = loops[idx][0]
+    header = basic_blocks[hidx]
+
+    # Generate the preheader and an
+    # unconditional goto to the header
+    preheader = BasicBlock()
+    goto = Tac()
+    l1 = get_temp_label()
+    goto.destination = l1
+    goto.destination_ins = header.instructions[0]
+    preheader.instructions.append(goto)
+
+    # Find all jump targets to the header,
+    # and if the source is not in loop,
+    # change it to the preheader
+    i = 0
+    while i < len(cfg):
+        if cfg[i][hidx] != 'None':
+            if i not in loops[idx]:
+                if basic_blocks[i].instructions[-1].destination_ins == header.instructions[0]:
+                    basic_blocks[i].instructions[-1].destination_ins = goto
+                else:
+                    basic_blocks[i].instructions[-1].else_destination_ins = goto
+        i = i + 1
+
+    # Insert the preheader in place of the header
+    basic_blocks.insert(hidx, preheader)
+
+    # Now all the cfg information is invalid
+    # So lets rebuild them
+    cfg = bb_to_cfg(basic_blocks)
+
+    # Rebulid the dominator tree
+    dom = find_dominators(cfg, basic_blocks)
+
+    # Rebulid the back edges list
+    back_edges = find_back_edges(cfg, dom)
+
+    # Finally, rebuild the loops
+    loops = []
+    for be in back_edges:
+        loops.append(get_natural_loop(cfg, be[0], be[1]))
+    print "New loops :", loops
+
+    # Return everything
+    return (basic_blocks, cfg, dom, back_edges, loops)
+
+def optimize_loop_invariants(cfg, basic_blocks, dom, loop):
+    preheader = basic_blocks[loop[0] - 1]
+    loopset = []
+    for m in loop:
+        loopset.append(basic_blocks[m])
+
+    loop_invariants = []
+    for i in loopset:
+        loop_invariants.extend(i.find_loop_invariants(loopset))
+
+    print loop_invariants
+
 class BasicBlock(object):
 
     def __init__(self):
@@ -236,6 +463,9 @@ class BasicBlock(object):
         # available to each instruction
         # of the block
         self.insavailset = {}
+        # The set of live variables
+        # at the end of the block
+        self.outliveset = None
 
     def __repr__(self):
         s = 'BasicBlock : {\n'
@@ -318,3 +548,24 @@ class BasicBlock(object):
         for i in self.instructions:
             print i, self.insavailset[i]
             i.eliminate_cse(self.insavailset[i])
+
+    def find_loop_invariants(self, loop):
+        loop_invariants = []
+        for i in self.instructions:
+            if i.is_loop_invariant(self.insreachset[i], loop):
+                loop_invariants.append(i)
+        return loop_invariants
+
+    def calculate_live_in(self):
+        if self.outliveset is None:
+            return set()
+        use = set()
+        defn = set()
+
+        for ins in self.instructions:
+            if ins.lhs is not None:
+                defn.add(ins.lhs.sid)
+            if ins.rhs is not None:
+                use = use.union(ins.rhs.get_used())
+
+        return use.union(self.outliveset.difference(defn))
