@@ -98,15 +98,22 @@ class Var(Atom):
         ret = True
         count = 0
         inloop = False
+        print get_string(self.sid), "->", inreachset
+        defs = []
         for vardef in inreachset: # For every reaching definition
-            if vardef.lhs == self:
-                for block in loop: # Search for it in the loop block
-                    if vardef in block.instructions: # There is a definition of the variable inside the loop
-                        inloop = True
-                        if count > 0: # There is more than one definition of it
-                            return False
-                        ret = ret and vardef.rhs.is_loop_invariant(inreachset, loop)
-            count = count + 1
+            if vardef.lhs == self: # Definition of present variable
+                defs.append(vardef)
+                count = count + 1
+
+        print vardef
+        for vardef in defs:
+            for block in loop: # Search for it in the loop block
+                if vardef in block.instructions: # There is a definition of the variable inside the loop
+                    inloop = True
+                    print "Declared", get_string(self.sid), " in loop, count :", count
+                    if count > 1: # There is more than one definition of it
+                        return False
+                    ret = ret and vardef.rhs.is_loop_invariant(inreachset, loop)
         if not inloop: # The variable was not defined inside the loop, it is invariant
             return True
         elif inloop and count == 1: # It is defined in the loop and that is the only definition
@@ -448,5 +455,6 @@ class Tac(object):
 
     def is_loop_invariant(self, inreachset, loop):
         if self.lhs is not None and self.rhs is not None:
-            return self.rhs.is_loop_invariant(inreachset, loop)
+            print "From tac :", inreachset
+            return self.lhs.is_loop_invariant(inreachset, loop) #and self.rhs.is_loop_invariant(inreachset, loop)
         return False

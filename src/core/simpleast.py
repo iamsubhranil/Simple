@@ -390,10 +390,12 @@ def entry_point(argv):
                     print get_string(i),
                 print "}"
 
-        for loop in loops:
-            print "\nSearching for loop invariants (loop:", loop, ")"
+        i = 0
+        while i < len(loops):
+            print "\nSearching for loop invariants (loop:", loops[i], ")"
             print "=============================="
-            optimize_loop_invariants(cfg, basic_blocks, dom, loop)
+            basic_blocks, cfg, dom, back_edges, loops = optimize_loop_invariants(cfg, basic_blocks, dom, back_edges, loops, i)
+            i = i + 1
 
         optimization("Common Subexpression Elimination", 1, cfg, basic_blocks, lambda x : x.eliminate_cse())
         optimization("Copy propagation", 2, cfg, basic_blocks, lambda x : x.propagate_copy())

@@ -264,6 +264,7 @@ def find_dominators(cfg, basic_blocks):
                 dom[i] = nw
             i = i + 1
 
+    """
     domtree = [None] * lenb
     i = 0
     while i < lenb:
@@ -281,9 +282,9 @@ def find_dominators(cfg, basic_blocks):
             domtree[max(dc)][i] = 1
         i = i + 1
 
-    #print "Domtree :", domtree
-    #view_cfg(domtree, basic_blocks)
-
+    print "Domtree :", domtree
+    view_cfg(domtree, basic_blocks)
+    """
     return dom
 
 def find_back_edges(cfg, dom):
@@ -336,7 +337,7 @@ def get_natural_loop(cfg, m, n):
             j = j + 1
         i = i + 1
 
-    print reachmat
+    #print reachmat
 
     k = 0
     while k < lc:
@@ -383,7 +384,8 @@ def insert_preheader(cfg, basic_blocks, loops, idx):
     goto.destination = l1
     goto.destination_ins = header.instructions[0]
     preheader.instructions.append(goto)
-
+    #print header, header.instructions[0].targetof
+    header.instructions[0].targetof[goto] = l1
     # Find all jump targets to the header,
     # and if the source is not in loop,
     # change it to the preheader
@@ -391,11 +393,25 @@ def insert_preheader(cfg, basic_blocks, loops, idx):
     while i < len(cfg):
         if cfg[i][hidx] != 'None':
             if i not in loops[idx]:
-                if basic_blocks[i].instructions[-1].destination_ins == header.instructions[0]:
-                    basic_blocks[i].instructions[-1].destination_ins = goto
+                #print "Target from", basic_blocks[i]
+                parent = basic_blocks[i].instructions[-1]
+                #print parent
+                if parent in header.instructions[0].targetof:
+                    #print "Popping"
+                    header.instructions[0].targetof.pop(parent, None)
+                if parent.destination_ins == header.instructions[0]:
+                    parent.destination_ins = goto
+                    if parent.destination is not None:
+                        #print "Dest :", parent.destination
+                        goto.targetof[parent] = parent.destination
                 else:
-                    basic_blocks[i].instructions[-1].else_destination_ins = goto
+                    #print "Else dest:", parent.else_destination
+                    if parent.else_destination is not None:
+                        goto.targetof[parent] = parent.else_destination
+                    parent.else_destination_ins = goto
         i = i + 1
+
+    #print "Goto.targetof :", goto.targetof
 
     # Insert the preheader in place of the header
     basic_blocks.insert(hidx, preheader)
@@ -419,17 +435,105 @@ def insert_preheader(cfg, basic_blocks, loops, idx):
     # Return everything
     return (basic_blocks, cfg, dom, back_edges, loops)
 
-def optimize_loop_invariants(cfg, basic_blocks, dom, loop):
-    preheader = basic_blocks[loop[0] - 1]
+def optimize_loop_invariants(cfg, basic_blocks, dom, back_edges, loops, idx):
+    preheader = basic_blocks[loops[idx][0] - 1]
     loopset = []
-    for m in loop:
+    for m in loops[idx]:
         loopset.append(basic_blocks[m])
 
     loop_invariants = []
-    for i in loopset:
-        loop_invariants.extend(i.find_loop_invariants(loopset))
+    for i in loops[idx]:
+        inv = basic_blocks[i].find_loop_invariants(loopset)
+        for iv in inv:
+            loop_invariants.append((iv, i))
 
     print loop_invariants
+
+    exit = loops[idx][-1]
+    removeblocks = []
+    changed = False
+    for (inv, idx) in loop_invariants:
+        if inv.lhs.sid in basic_blocks[exit].outliveset: # variable is live at exit
+            if idx in dom[exit]: # The block containing the variable dominates the exit,
+                                # hence it can be moved to the preheader
+                # Mark to show the CFG
+                changed = True
+                block = basic_blocks[idx]
+                # Check whether it is the leader of the block
+                if block.instructions[0] == inv:
+                    if len(block.instructions) > 1: # Move the targets to the next instruction
+                        block.instructions[1].targetof = inv.targetof
+                        # Reset the targets to point to the next instruction
+                        for target in block.instructions[1].targetof:
+                            if target.destination_ins == inv: # It was an if or unconditional target
+                                target.destination_ins = block.instructions[1]
+                            else: # It was an else target
+                                target.else_destination_ins = block.instructions[1]
+                    else: # There is no other instruction in the block.
+                        # So remove it, retargetting its parent(s) to the next block.
+                        # This can only happen when there is only one assignment in
+                        # a block, hence it can be safely assumed that it will have
+                        # only one target, that too, will be the next block in the graph.
+                        for target in block.targetof:
+                            target.destinations.remove(block)
+                            target.destinations.extend(block.destinations)
+                            for dest in block.destinations:
+                                dest.targetof.remove(block)
+                                dest.targetof[target] = block.targetof[target]
+                        # Mark the block for removal
+                        removeblocks.append(block)
+                # Finally remove the instruction from the block
+                block.instructions.remove(inv)
+                # Reset its parents
+                inv.targetof = {}
+                # Check whether it is going to be the leader of the
+                # preheader
+                if len(preheader.instructions) == 1:
+                    inv.targetof = preheader.instructions[0].targetof
+                    # Reset the targets to point to the next instruction
+                    for target in inv.targetof:
+                        if target.destination_ins == preheader.instructions[0]: # It was an if or unconditional target
+                            target.destination_ins = inv
+                        else: # It was an else target
+                            target.else_destination_ins = inv
+                # FINALLY, insert it to the last but one position of the preheader
+                preheader.instructions.insert(len(preheader.instructions) - 1, inv)
+    if len(removeblocks) > 0:
+        for block in removeblocks:
+            basic_blocks.remove(block)
+
+        # Now all the cfg information is invalid
+        # So lets rebuild them
+        cfg = bb_to_cfg(basic_blocks)
+
+        # Rebulid the dominator tree
+        dom = find_dominators(cfg, basic_blocks)
+
+        # Rebulid the back edges list
+        back_edges = find_back_edges(cfg, dom)
+
+        # Finally, rebuild the loops
+        loops = []
+        for be in back_edges:
+            loops.append(get_natural_loop(cfg, be[0], be[1]))
+        print "New loops :", loops
+
+    if changed:
+        # Refind reaching definitions, available expressions
+        # and liveness information
+        print "Invariant statement(s) moved!"
+        print "Recalculating reaching definitions"
+        find_reaching_definitions(cfg, basic_blocks)
+        print "Recalculating available expressions"
+        find_available_expressions(cfg, basic_blocks)
+        print "Recalculating live variables"
+        find_live_variables(cfg, basic_blocks)
+        print basic_blocks
+        print_cfg(cfg, basic_blocks)
+        view_cfg(cfg, basic_blocks)
+
+    # Return everything
+    return (basic_blocks, cfg, dom, back_edges, loops)
 
 class BasicBlock(object):
 
@@ -471,10 +575,10 @@ class BasicBlock(object):
         s = 'BasicBlock : {\n'
         for i in self.instructions:
             s = s + str(i)
-            #try:
-            #    s = s + ' in' + str(self.insreachset[i])
-            #except KeyError:
-            #    pass
+            try:
+                s = s + ' in' + str(self.insreachset[i])
+            except KeyError:
+                pass
             s = s + '\n'
         s = s + '\n}'
         return s
@@ -552,6 +656,7 @@ class BasicBlock(object):
     def find_loop_invariants(self, loop):
         loop_invariants = []
         for i in self.instructions:
+            print "From block :", self.insreachset[i]
             if i.is_loop_invariant(self.insreachset[i], loop):
                 loop_invariants.append(i)
         return loop_invariants
