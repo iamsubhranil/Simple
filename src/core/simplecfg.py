@@ -575,10 +575,10 @@ class BasicBlock(object):
         s = 'BasicBlock : {\n'
         for i in self.instructions:
             s = s + str(i)
-            try:
-                s = s + ' in' + str(self.insreachset[i])
-            except KeyError:
-                pass
+           # try:
+           #     s = s + ' in' + str(self.insreachset[i])
+           # except KeyError:
+           #     pass
             s = s + '\n'
         s = s + '\n}'
         return s

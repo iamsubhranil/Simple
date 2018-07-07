@@ -5,6 +5,37 @@ class Atom(object):
 
     def __init__(self):
         self.name = 'Atom'
+        # A cache of the last
+        # reached definition
+        # to the object.
+        # If it matches to the
+        # given inreachset, then
+        # the cached result
+        # is returned
+        self.last_reached_def = None
+        # All the cache objects here
+        # are initialized with unique
+        # values which they can never
+        # take in their lifetime
+        # to denote that they
+        # have not even been initialized
+
+        # A dictionary mapping loop id
+        # to variance
+        # An expression which is
+        # declared to be variant
+        # in a loop cannot be invariant,
+        # however the reverse is not
+        # true
+        self.last_loop_variancy = {}
+        self.last_constant = None
+        self.last_expression = 0
+
+    def reset_cache(self, inreachset):
+        self.last_reached_def = inreachset
+        self.last_loop_variancy = {}
+        self.last_constant = None
+        self.last_expression = 0
 
     # The set of reaching definitions 
     # given as one argument, the 
@@ -14,7 +45,11 @@ class Atom(object):
     # evaluated due to multiple
     # reaching definitions
     def fold_constants(self, inset):
-        print "Override this"
+        found = True
+        if self.last_reached_def != inset or self.last_constant == None:
+            found = False
+            self.reset_cache(inset)
+        return self.last_constant, found
 
     # The set of reaching definitions
     # given as the argument.
@@ -22,7 +57,11 @@ class Atom(object):
     # replaced expression if possible,
     # otherwise the expression itself
     def propagate_copy(self, inreachset):
-        print "Override this"
+        found = True
+        if self.last_reached_def != inreachset or self.last_expression == 0:
+            found = False
+            self.reset_cache(inreachset)
+        return self.last_expression, found
 
     # Returns true if the expression
     # contains the variable
@@ -35,7 +74,15 @@ class Atom(object):
     # Returns true if the variable or expression
     # is loop invariant
     def is_loop_invariant(self, inreachset, loop):
-        print "Override this"
+        found = True
+        if id(loop) in self.last_loop_variancy:
+            return self.last_loop_variancy[id(loop)], True
+        else:
+            print self, "[no variancy found for the", inreachset, "]"
+            found = False
+            self.reset_cache(inreachset)
+            self.last_loop_variancy[id(loop)] = False
+        return self.last_loop_variancy[id(loop)], found
 
     # Returns the set of used variables in the expression
     def get_used(self):
@@ -44,6 +91,7 @@ class Atom(object):
 class Var(Atom):
 
     def __init__(self, sid):
+        Atom.__init__(self)
         self.name = 'AtomVar'
         self.sid = sid
 
@@ -68,9 +116,14 @@ class Var(Atom):
         return res
 
     def fold_constants(self, inset):
+        res, found = Atom.fold_constants(self, inset)
+        if found:
+            return res
+
         res = self.find_only_definition(inset)
         if res is not None and isinstance(res, Const):
             #print "Found only def of (", self, ") at (", res, ")"
+            self.last_constant = res.value
             return res.value
         return None
 
@@ -80,12 +133,18 @@ class Var(Atom):
     # replaced variable if possible,
     # otherwise the variable itself
     def propagate_copy(self, inset):
+        res, found = Atom.propagate_copy(self, inset)
+        if found:
+            return res
+
         res = self.find_only_definition(inset)
         if res is not None:
             if isinstance(res, Var): # The only definition is of the form x = y
                 v = res.find_only_definition(inset) # Try to find the only definition of y
                 if v is not None: # y is only defined once, hence return directly
+                    self.last_expression = res
                     return res
+        self.last_expression = self
         return self
 
     def contains(self, sid):
@@ -95,6 +154,11 @@ class Var(Atom):
         return isinstance(other, Var) and self.sid == other.sid
 
     def is_loop_invariant(self, inreachset, loop):
+        res, found = Atom.is_loop_invariant(self, inreachset, loop)
+        if found:
+            return res
+
+        self.last_loop_variancy[id(loop)] = False
         ret = True
         count = 0
         inloop = False
@@ -105,19 +169,22 @@ class Var(Atom):
                 defs.append(vardef)
                 count = count + 1
 
-        print vardef
         for vardef in defs:
             for block in loop: # Search for it in the loop block
                 if vardef in block.instructions: # There is a definition of the variable inside the loop
                     inloop = True
                     print "Declared", get_string(self.sid), " in loop, count :", count
                     if count > 1: # There is more than one definition of it
+                        self.last_loop_variancy[id(loop)] = False
                         return False
                     ret = ret and vardef.rhs.is_loop_invariant(inreachset, loop)
         if not inloop: # The variable was not defined inside the loop, it is invariant
+            self.last_loop_variancy[id(loop)] = True
             return True
         elif inloop and count == 1: # It is defined in the loop and that is the only definition
+            self.last_loop_variancy[id(loop)] = ret
             return ret
+        self.last_loop_variancy[id(loop)] = False
         return False # None of them holds
 
     def get_used(self):
@@ -126,6 +193,7 @@ class Var(Atom):
 class Const(Atom):
 
     def __init__(self, value):
+        Atom.__init__(self)
         self.name = 'AtomConst'
         self.value = value
 
@@ -156,6 +224,7 @@ class Const(Atom):
 class AtomicOp(Atom):
 
     def __init__(self):
+        Atom.__init__(self)
         self.name = 'AtomicOp'
 
 def func_not(val):
@@ -167,6 +236,7 @@ def func_neg(val):
 class UnOp(AtomicOp):
 
     def __init__(self, right, op):
+        Atom.__init__(self)
         self.name = 'AtomicOp' + str(op)
         self.right = right
         self.op = op
@@ -180,14 +250,24 @@ class UnOp(AtomicOp):
         return str(self.op) + ' ' + self.right.nocolor()
 
     def fold_constants(self, inset):
+        res, found = Atom.fold_constants(self, inset)
+        if found:
+            return res
+
         val = self.right.fold_constants()
         if val is not None:
-            return self.function[self.op](val)
+            self.last_constant = self.function[self.op](val)
+            return self.last_constant
         return None
 
     def propagate_copy(self, inset):
+        res, found = Atom.propagate_copy(self, inset)
+        if found:
+            return res
+
         if isinstance(self.right, Var):
             self.right = self.right.propagate_copy(inset)
+        self.last_expression = self
         return self
 
     def contains(self, sid):
@@ -207,7 +287,12 @@ class UnOp(AtomicOp):
         return self
 
     def is_loop_invariant(self, inreachset, loop):
-        return self.right.is_loop_invariant(inreachset, loop)
+        res, found = Atom.is_loop_invariant(self, inreachset, loop)
+        if found:
+            return res
+
+        self.last_loop_variancy[id(loop)] = self.right.is_loop_invariant(inreachset, loop)
+        return self.last_loop_variancy[id(loop)]
 
     def get_used(self):
         return self.right.get_used()
@@ -254,6 +339,7 @@ def func_or(x, y):
 class BinOp(AtomicOp):
 
     def __init__(self, left, right, op):
+        Atom.__init__(self)
         self.name = 'AtomicOp' + str(op)
         self.left = left
         self.right = right
@@ -279,6 +365,10 @@ class BinOp(AtomicOp):
         return self.left.nocolor() + ' ' + str(self.op) + ' ' + self.right.nocolor()
 
     def fold_constants(self, inset):
+        res, found = Atom.fold_constants(self, inset)
+        if found:
+            return res
+
         lval = self.left.fold_constants(inset)
         rval = self.right.fold_constants(inset)
         # Although we may not be able to calculate
@@ -289,14 +379,20 @@ class BinOp(AtomicOp):
         if rval is not None:
             self.right = Const(rval)
         if lval is not None and rval is not None:
-            return self.function[self.op](lval, rval)
+            self.last_constant = self.function[self.op](lval, rval)
+            return self.last_constant
         return None
 
     def propagate_copy(self, inset):
+        res, found = Atom.propagate_copy(self, inset)
+        if found:
+            return res
+
         if isinstance(self.left, Var):
             self.left = self.left.propagate_copy(inset)
         if isinstance(self.right, Var):
             self.right = self.right.propagate_copy(inset)
+        self.last_expression = self
         return self
 
     def contains(self, sid):
@@ -318,11 +414,19 @@ class BinOp(AtomicOp):
         return self
 
     def is_loop_invariant(self, inreachset, loop):
-        return self.left.is_loop_invariant(inreachset, loop) and self.right.is_loop_invariant(inreachset, loop)
+        res, found = Atom.is_loop_invariant(self, inreachset, loop)
+        print res, found
+        if found:
+            return res
+
+        self.last_loop_variancy[id(loop)] = self.left.is_loop_invariant(inreachset, loop) and self.right.is_loop_invariant(inreachset, loop)
+        return self.last_loop_variancy[id(loop)]
 
     def get_used(self):
         return self.left.get_used().union(self.right.get_used())
 
+# Derive it from Atom to provide cache features
+# We'll see if any problem comes
 class Tac(object):
 
     def __init__(self):
@@ -372,6 +476,18 @@ class Tac(object):
         # jump, then it is set to
         # the condition.
         self.rhs = None
+        # The last set of reaching
+        # definitions that reached
+        # this statement. If that
+        # remains same, then there
+        # is no need to recalculate
+        # the invariancy, just return
+        # the cache
+        self.last_reached_def = None
+        # Whether this instruction was
+        # loop in variant in context
+        # with last_reached_def
+        self.last_invariancy_status = False
 
     def __repr__(self):
         s = ''
@@ -455,6 +571,7 @@ class Tac(object):
 
     def is_loop_invariant(self, inreachset, loop):
         if self.lhs is not None and self.rhs is not None:
-            print "From tac :", inreachset
-            return self.lhs.is_loop_invariant(inreachset, loop) #and self.rhs.is_loop_invariant(inreachset, loop)
+            print "From tac :", self, inreachset
+            return self.rhs.is_loop_invariant(inreachset, loop) #and self.rhs.is_loop_invariant(inreachset, loop)
+            #return self.last_invariancy_status
         return False

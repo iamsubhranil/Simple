@@ -390,6 +390,8 @@ def entry_point(argv):
                     print get_string(i),
                 print "}"
 
+        #optimization("Copy propagation", 0, cfg, basic_blocks, lambda x : x.propagate_copy())
+
         i = 0
         while i < len(loops):
             print "\nSearching for loop invariants (loop:", loops[i], ")"
@@ -403,6 +405,15 @@ def entry_point(argv):
         # Some expressions can still be optimized after performing a different optimization
         # What is the correct order of optimization then?
         #optimization("Common Subexpression Elimination", 4, cfg, basic_blocks, lambda x : x.eliminate_cse())
+        print "\nLive variables"
+        print "================"
+        find_live_variables(cfg, basic_blocks)
+        for bb in basic_blocks:
+            if bb.outliveset != None:
+                print bb, "LiveOut : {",
+                for i in bb.outliveset:
+                    print get_string(i),
+                print "}"
     except ParseError as e:
         disp("\n\n")
         if we_are_translated():
