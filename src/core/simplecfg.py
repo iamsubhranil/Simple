@@ -133,8 +133,8 @@ def view_cfg(cfg, basic_blocks, name = "CFG"):
     """content.extend(basic_blocks[0].view())
     # Show all nonreachable blocks
     for block in basic_blocks:
-        if block.viewed != 1:
-            content.extend(block.view())
+    if block.viewed != 1:
+    content.extend(block.view())
     """
     content.append("\n}")
     #print content
@@ -268,19 +268,19 @@ def find_dominators(cfg, basic_blocks):
     domtree = [None] * lenb
     i = 0
     while i < lenb:
-        domtree[i] = ['None'] * lenb
-        dc = set(dom[i])
-        if i == 0:
-            i = i + 1
-            continue
-        dc.remove(i)
-        if i != 0:
-            dc.remove(0)
-        if len(dc) == 0:
-            domtree[0][i] = 1
-        else:
-            domtree[max(dc)][i] = 1
-        i = i + 1
+    domtree[i] = ['None'] * lenb
+    dc = set(dom[i])
+    if i == 0:
+    i = i + 1
+    continue
+    dc.remove(i)
+    if i != 0:
+    dc.remove(0)
+    if len(dc) == 0:
+    domtree[0][i] = 1
+    else:
+    domtree[max(dc)][i] = 1
+    i = i + 1
 
     print "Domtree :", domtree
     view_cfg(domtree, basic_blocks)
@@ -309,14 +309,14 @@ def get_natural_loop(cfg, m, n):
     loop.add(n)
     stack.append(n)
     while len(stack) > 0:
-        x = stack.pop()
-        i = 0
-        while i < x:
-            if cfg[i][x] != 'None':
-                if i not in loop:
-                    loop.add(i)
-                    stack.append(i)
-            i = i + 1
+    x = stack.pop()
+    i = 0
+    while i < x:
+    if cfg[i][x] != 'None':
+    if i not in loop:
+    loop.add(i)
+    stack.append(i)
+    i = i + 1
     #return loop
     """
     # The back edge is from n -> m
@@ -455,49 +455,15 @@ def optimize_loop_invariants(cfg, basic_blocks, dom, back_edges, loops, idx):
     for (inv, idx) in loop_invariants:
         if inv.lhs.sid in basic_blocks[exit].outliveset: # variable is live at exit
             if idx in dom[exit]: # The block containing the variable dominates the exit,
-                                # hence it can be moved to the preheader
+                # hence it can be moved to the preheader
                 # Mark to show the CFG
                 changed = True
                 block = basic_blocks[idx]
-                # Check whether it is the leader of the block
-                if block.instructions[0] == inv:
-                    if len(block.instructions) > 1: # Move the targets to the next instruction
-                        block.instructions[1].targetof = inv.targetof
-                        # Reset the targets to point to the next instruction
-                        for target in block.instructions[1].targetof:
-                            if target.destination_ins == inv: # It was an if or unconditional target
-                                target.destination_ins = block.instructions[1]
-                            else: # It was an else target
-                                target.else_destination_ins = block.instructions[1]
-                    else: # There is no other instruction in the block.
-                        # So remove it, retargetting its parent(s) to the next block.
-                        # This can only happen when there is only one assignment in
-                        # a block, hence it can be safely assumed that it will have
-                        # only one target, that too, will be the next block in the graph.
-                        for target in block.targetof:
-                            target.destinations.remove(block)
-                            target.destinations.extend(block.destinations)
-                            for dest in block.destinations:
-                                dest.targetof.remove(block)
-                                dest.targetof[target] = block.targetof[target]
-                        # Mark the block for removal
-                        removeblocks.append(block)
-                # Finally remove the instruction from the block
-                block.instructions.remove(inv)
-                # Reset its parents
-                inv.targetof = {}
-                # Check whether it is going to be the leader of the
-                # preheader
-                if len(preheader.instructions) == 1:
-                    inv.targetof = preheader.instructions[0].targetof
-                    # Reset the targets to point to the next instruction
-                    for target in inv.targetof:
-                        if target.destination_ins == preheader.instructions[0]: # It was an if or unconditional target
-                            target.destination_ins = inv
-                        else: # It was an else target
-                            target.else_destination_ins = inv
-                # FINALLY, insert it to the last but one position of the preheader
-                preheader.instructions.insert(len(preheader.instructions) - 1, inv)
+                block.remove_ins(inv)
+                if len(block.instructions) == 0:
+                    # Mark the block for removal
+                    removeblocks.append(block)
+                preheader.append_ins(inv)
     if len(removeblocks) > 0:
         for block in removeblocks:
             basic_blocks.remove(block)
@@ -575,10 +541,10 @@ class BasicBlock(object):
         s = 'BasicBlock : {\n'
         for i in self.instructions:
             s = s + str(i)
-           # try:
-           #     s = s + ' in' + str(self.insreachset[i])
-           # except KeyError:
-           #     pass
+            # try:
+            #     s = s + ' in' + str(self.insreachset[i])
+            # except KeyError:
+            #     pass
             s = s + '\n'
         s = s + '\n}'
         return s
@@ -674,3 +640,50 @@ class BasicBlock(object):
                 use = use.union(ins.rhs.get_used())
 
         return use.union(self.outliveset.difference(defn))
+
+    # Removes an instruction from the block
+    def remove_ins(self, inv):
+        # Check whether it is the leader of the block
+        if self.instructions[0] == inv:
+            if len(self.instructions) > 1: # Move the targets to the next instruction
+                self.instructions[1].targetof = inv.targetof
+                # Reset the targets to point to the next instruction
+                for target in self.instructions[1].targetof:
+                    if target.destination_ins == inv: # It was an if or unconditional target
+                        target.destination_ins = self.instructions[1]
+                    else: # It was an else target
+                        target.else_destination_ins = self.instructions[1]
+            else: # There is no other instruction in the block.
+                # So remove it, retargetting its parent(s) to the next block.
+                # This can only happen when there is only one assignment in
+                # a block, hence it can be safely assumed that it will have
+                # only one target, that too, will be the next block in the graph.
+                for target in self.targetof:
+                    target.destinations.remove(self)
+                    target.destinations.extend(self.destinations)
+                    for dest in block.destinations:
+                        dest.targetof.remove(self)
+                        dest.targetof[target] = self.targetof[target]
+        self.instructions.remove(inv)
+
+    # Append an instruction to the block
+    # If there is only one instruction in the block,
+    # it is assumed that the instruction is
+    # some kind of jump (otherwise you wouldn't
+    # use this), and in consequence
+    # it makes the argument as its leader
+    # Otherwise, it appends the instruction
+    # to the last but one position
+    def append_ins(self, inv):
+        # Check whether it is going to be the leader of the
+        # preheader
+        if len(self.instructions) == 1:
+            inv.targetof = self.instructions[0].targetof
+            # Reset the targets to point to the next instruction
+            for target in inv.targetof:
+                if target.destination_ins == self.instructions[0]: # It was an if or unconditional target
+                    target.destination_ins = inv
+                else: # It was an else target
+                    target.else_destination_ins = inv
+        # FINALLY, insert it to the last but one position of the preheader
+        self.instructions.insert(len(self.instructions) - 1, inv)
