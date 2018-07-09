@@ -9,8 +9,9 @@
     1. Constant folding using reaching definitions (done)
     2. Copy propagation using reaching definitions (done)
     3. Common subexpression elimination using available expressions (done)
-    4. Dead code elimination using liveness analysis
-    5. Loop invariant code motion
-    6. Peephole optimizations (Strength reduction)
-    7. Loop unrolling
+    4. Dead code elimination using liveness analysis (done)
+    5. Unreachable code elimination (done)
+    6. Loop invariant code motion (done)
+    7. Peephole optimizations (Strength reduction)
+    8. Loop unrolling
 6. No function calls, no objects until all goals are completed
