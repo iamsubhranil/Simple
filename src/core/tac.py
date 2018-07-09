@@ -78,7 +78,7 @@ class Atom(object):
         if id(loop) in self.last_loop_variancy:
             return self.last_loop_variancy[id(loop)], True
         else:
-            print self, "[no variancy found for the", inreachset, "]"
+            #print self, "[no variancy found for the", inreachset, "]"
             found = False
             self.reset_cache(inreachset)
             self.last_loop_variancy[id(loop)] = False
@@ -158,11 +158,11 @@ class Var(Atom):
         if found:
             return res
 
-        self.last_loop_variancy[id(loop)] = False
+        self.last_loop_variancy[id(loop)] = True
         ret = True
         count = 0
         inloop = False
-        print get_string(self.sid), "->", inreachset
+        print get_string(self.sid), "->", inreachset,
         defs = []
         for vardef in inreachset: # For every reaching definition
             if vardef.lhs == self: # Definition of present variable
@@ -176,14 +176,18 @@ class Var(Atom):
                     print "Declared", get_string(self.sid), " in loop, count :", count
                     if count > 1: # There is more than one definition of it
                         self.last_loop_variancy[id(loop)] = False
+                        print "False [more than one definition and inside loop]"
                         return False
                     ret = ret and vardef.rhs.is_loop_invariant(inreachset, loop)
         if not inloop: # The variable was not defined inside the loop, it is invariant
+            print "True [defined outside of the loop]"
             self.last_loop_variancy[id(loop)] = True
             return True
         elif inloop and count == 1: # It is defined in the loop and that is the only definition
+            print ret, "[defined inside the loop and is only definition]"
             self.last_loop_variancy[id(loop)] = ret
             return ret
+        print "False [nothing holds]"
         self.last_loop_variancy[id(loop)] = False
         return False # None of them holds
 
@@ -552,10 +556,14 @@ class Tac(object):
             if val is not None:
                 if val is True: # condition is always true
                     self.rhs = None # make it unconditional
-                elif val is False: # condition is always false
+                else: # condition is always false
                     self.destination = self.else_destination # Make the else block as the destination
+                    self.destination_ins.targetof.pop(self, None) # Reset the target's parent
                     self.destination_ins = self.else_destination_ins
                     self.rhs = None # make it unconditional
+                self.else_destination = None # Remove else targets
+                self.else_destination_ins.targetof.pop(self, None) # Reset the target's parent
+                self.else_destination_ins = None
 
     def propagate_copy(self, inset):
         if self.rhs is not None:
@@ -571,7 +579,7 @@ class Tac(object):
 
     def is_loop_invariant(self, inreachset, loop):
         if self.lhs is not None and self.rhs is not None:
-            print "From tac :", self, inreachset
+            print "From tac :", self #, inreachset
             return self.rhs.is_loop_invariant(inreachset, loop) #and self.rhs.is_loop_invariant(inreachset, loop)
             #return self.last_invariancy_status
         return False

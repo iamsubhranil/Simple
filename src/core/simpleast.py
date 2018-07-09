@@ -1,6 +1,7 @@
 from rpython.rlib.parsing.parsing import *
 from rpython.rlib.parsing.ebnfparse import *
 from rpython.rlib.parsing.lexer import *
+import sys
 
 from lexpar import parser, lexer, KoolToAST
 from strtbl import get_string, register_string
@@ -8,7 +9,8 @@ from simplenodes import *
 from simplecfg import find_basic_blocks, bb_to_cfg, print_cfg, view_cfg, \
     find_reaching_definitions, find_available_expressions, \
     find_dominators, find_back_edges, get_natural_loop, \
-    insert_preheader, optimize_loop_invariants, find_live_variables
+    insert_preheader, optimize_loop_invariants, find_live_variables, \
+    eliminate_dead_code, rebuild_all, eliminate_dead_blocks
 
 def disp(s):
     print s,
@@ -362,7 +364,7 @@ def entry_point(argv):
             print "===================="
             basic_blocks, cfg, dom, back_edges, loops = insert_preheader(cfg, basic_blocks, loops, i)
 
-            print "\nAfter Initializing preheder"
+            print "\nAfter Initializing preheader"
             print "============================"
             print_cfg(cfg, basic_blocks)
             view_cfg(cfg, basic_blocks)
@@ -402,9 +404,25 @@ def entry_point(argv):
         optimization("Common Subexpression Elimination", 1, cfg, basic_blocks, lambda x : x.eliminate_cse())
         optimization("Copy propagation", 2, cfg, basic_blocks, lambda x : x.propagate_copy())
         optimization("Constant Folding", 3, cfg, basic_blocks, lambda x : x.fold_constants())
+        # Constant folding may have modified the cfg
+        # Let's rebuild
+        basic_blocks, cfg, dom, back_edges, loops = rebuild_all(basic_blocks)
         # Some expressions can still be optimized after performing a different optimization
         # What is the correct order of optimization then?
         #optimization("Common Subexpression Elimination", 4, cfg, basic_blocks, lambda x : x.eliminate_cse())
+
+        print "\nReaching definitions"
+        print "====================="
+        find_reaching_definitions(cfg, basic_blocks)
+        for bb in basic_blocks:
+            print bb, "Inset : ", bb.inreachset
+
+        print "\nAvailable expressions"
+        print "======================"
+        find_available_expressions(cfg, basic_blocks)
+        for bb in basic_blocks:
+            print bb, "Avail" + str(bb.inavailset)
+
         print "\nLive variables"
         print "================"
         find_live_variables(cfg, basic_blocks)
@@ -414,6 +432,23 @@ def entry_point(argv):
                 for i in bb.outliveset:
                     print get_string(i),
                 print "}"
+
+        print "\nAfter eliminating dead code"
+        print "============================\n"
+
+        basic_blocks, cfg, dom, back_edges, loops = eliminate_dead_code(basic_blocks, cfg, dom, back_edges, loops)
+
+        print_cfg(cfg, basic_blocks)
+        view_cfg(cfg, basic_blocks)
+
+        print "\nAfter eliminating dead blocks"
+        print "==============================\n"
+
+        basic_blocks, cfg, dom, back_edges, loops = eliminate_dead_blocks(basic_blocks, cfg, dom, back_edges, loops)
+
+        print_cfg(cfg, basic_blocks)
+        view_cfg(cfg, basic_blocks)
+
     except ParseError as e:
         disp("\n\n")
         if we_are_translated():
@@ -425,8 +460,7 @@ def entry_point(argv):
 
 def target(driver, args):
     driver.exe_name = 'kool-%(backend)s'
-    return entry_point, args
+    return entry_point, None
 
 if __name__ == '__main__':
-    import sys
     entry_point(sys.argv)

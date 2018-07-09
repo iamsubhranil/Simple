@@ -1,5 +1,6 @@
 from tac import Tac
 from simplenodes import get_temp_label
+from Queue import *
 
 def find_index(instructions):
     def fi(ins):
@@ -60,6 +61,7 @@ def bb_to_cfg(basic_blocks):
     cfg = [None] * len(basic_blocks)
     while i < len(basic_blocks):
         x = basic_blocks[i].instructions[-1]
+        basic_blocks[i].destinations = []
         cfg[i] = ['None'] * len(basic_blocks)
         if x.is_branch():
             ins = x.destination_ins
@@ -87,7 +89,7 @@ def bb_to_cfg(basic_blocks):
                     basic_blocks[i].destinations.append(basic_blocks[j])
                     break
                 j = j + 1
-        if x.rhs is not None and x.lhs is not None: # it is an assignment
+        elif x.rhs is not None and x.lhs is not None: # it is an assignment
             if i < len(basic_blocks) - 1:
                 lbl = ' '
                 #if x.is_branch():
@@ -150,83 +152,83 @@ def view_cfg(cfg, basic_blocks, name = "CFG"):
             p.dirpath().remove
 
 def find_reaching_definitions(cfg, basic_blocks):
-    out = {}
+    out = []
     for bb in basic_blocks:
-        out[bb] = None
+        out.append(set())
 
     changed = True
     while changed:
         changed = False
         i = 0
         while i < len(basic_blocks):
-            prevout = out[basic_blocks[i]]
+            prevout = out[i]
             j = 0
             inbb = set()
             while j < len(basic_blocks): # Also consider successors since loop is natural
                 if cfg[j][i] != 'None':
                     #print "Out : ", basic_blocks[j].calculate_reaching_defs()
-                    inbb = inbb.union(basic_blocks[j].calculate_reaching_defs())
+                    inbb = inbb.union(out[j])
                     #print "In : ", inbb
                 j = j + 1
             basic_blocks[i].inreachset = inbb
             newout = basic_blocks[i].calculate_reaching_defs()
             if newout != prevout:
-                out[basic_blocks[i]] = newout
+                out[i] = newout
                 changed = True
                 break
             i = i + 1
 
 def find_available_expressions(cfg, basic_blocks):
-    out = {}
+    out = []
     for bb in basic_blocks:
-        out[bb] = None
+        out.append(set())
 
     changed = True
     while changed:
         changed = False
         i = 0
         while i < len(basic_blocks):
-            prevout = out[basic_blocks[i]]
+            prevout = out[i]
             j = 0
             inbb = set()
             while j < i: # Only consider predecessors
                 if cfg[j][i] != 'None':
                     #print basic_blocks[i], basic_blocks[j]
                     #print "Out : ", basic_blocks[j].calculate_avail()
-                    inbb = inbb.union(basic_blocks[j].calculate_avail())
+                    inbb = inbb.union(out[j])
                     #print "In : ", inbb
                 j = j + 1
             basic_blocks[i].inavailset = inbb
             newout = basic_blocks[i].calculate_avail()
             if newout != prevout:
-                out[basic_blocks[i]] = newout
+                out[i] = newout
                 changed = True
                 break
             i = i + 1
 
 
 def find_live_variables(cfg, basic_blocks):
-    inset = {}
+    inset = []
 
     for bb in basic_blocks:
-        inset[bb] = None
+        inset.append(set())
 
     changed = True
     while changed:
         changed = False
         i = len(basic_blocks) - 1
-        while i > 0:
-            previn = inset[basic_blocks[i]]
+        while i >= 0:
+            previn = inset[i]
             j = 0 # Only search for successors
             outset = set()
             while j < len(basic_blocks):
                 if cfg[i][j] != 'None':
-                    outset = outset.union(basic_blocks[j].calculate_live_in())
+                    outset = outset.union(inset[j])
                 j = j + 1
             basic_blocks[i].outliveset = outset
             nwin = basic_blocks[i].calculate_live_in()
             if nwin != previn:
-                inset[basic_blocks[i]] = nwin
+                inset[i] = nwin
                 changed = True
                 #break
             i = i - 1
@@ -435,6 +437,88 @@ def insert_preheader(cfg, basic_blocks, loops, idx):
     # Return everything
     return (basic_blocks, cfg, dom, back_edges, loops)
 
+def eliminate_dead_code(basic_blocks, cfg, dom, back_edges, loops):
+    removeblocks = []
+    for block in basic_blocks:
+        block.eliminate_dead_code()
+        #block.remove_only_goto()
+        if len(block.instructions) == 0:
+            removeblocks.append(block)
+
+    if len(removeblocks) > 0:
+        basic_blocks, cfg, dom, back_edges, loops = remove_blocks(removeblocks, basic_blocks)
+
+    return basic_blocks, cfg, dom, back_edges, loops
+
+# Calculate reachable blocks
+def calculate_reachbility(basic_blocks):
+    for bb in basic_blocks:
+        bb.reachable = False
+
+    blocklist = []
+    blocklist.append(basic_blocks[0])
+
+    while len(blocklist) > 0:
+        block = blocklist.pop()
+        if not block.reachable:
+            block.reachable = True
+            for dest in block.destinations:
+                if not dest.reachable:
+                    blocklist.append(dest)
+
+# Remove unreachable blocks
+def eliminate_dead_blocks(basic_blocks, cfg, dom, back_edges, loops):
+    calculate_reachbility(basic_blocks)
+    removable = []
+    for bb in basic_blocks:
+        if not bb.reachable:
+            print bb, "is not reachable"
+            removable.append(bb)
+    if len(removable) > 0:
+        return remove_blocks(removable, basic_blocks)
+    else:
+        return basic_blocks, cfg, dom, back_edges, loops
+
+# After constant folding and dead code elimination,
+# some blocks only have one unconditional jump
+# instruction inside them. This pass removes
+# those blocks and directly connects their
+# predecessors and successors instead
+def eliminate_only_goto(basic_blocks, cfg, dom, back_edges, loops):
+    calculate_reachbility(basic_blocks)
+    removable = []
+    for bb in basic_blocks:
+        if bb.eliminate_only_goto():
+            removable.append(bb)
+    if len(removable) > 0:
+        return remove_blocks(removable, basic_blocks)
+    else:
+        return basic_blocks, cfg, dom, back_edges, loops
+
+# Remove a block from the list
+def remove_blocks(removeblocks, basic_blocks):
+    for block in removeblocks:
+        basic_blocks.remove(block)
+    return rebuild_all(basic_blocks)
+
+# Rebuild everything from basic blocks
+def rebuild_all(basic_blocks):
+    # Rebuild the cfg
+    cfg = bb_to_cfg(basic_blocks)
+
+    # Rebulid the dominator tree
+    dom = find_dominators(cfg, basic_blocks)
+
+    # Rebulid the back edges list
+    back_edges = find_back_edges(cfg, dom)
+
+    # Finally, rebuild the loops
+    loops = []
+    for be in back_edges:
+        loops.append(get_natural_loop(cfg, be[0], be[1]))
+
+    return basic_blocks, cfg, dom, back_edges, loops
+
 def optimize_loop_invariants(cfg, basic_blocks, dom, back_edges, loops, idx):
     preheader = basic_blocks[loops[idx][0] - 1]
     loopset = []
@@ -453,35 +537,25 @@ def optimize_loop_invariants(cfg, basic_blocks, dom, back_edges, loops, idx):
     removeblocks = []
     changed = False
     for (inv, idx) in loop_invariants:
+        canbemoved = False
         if inv.lhs.sid in basic_blocks[exit].outliveset: # variable is live at exit
             if idx in dom[exit]: # The block containing the variable dominates the exit,
                 # hence it can be moved to the preheader
                 # Mark to show the CFG
                 changed = True
-                block = basic_blocks[idx]
-                block.remove_ins(inv)
-                if len(block.instructions) == 0:
-                    # Mark the block for removal
-                    removeblocks.append(block)
-                preheader.append_ins(inv)
+                canbemoved = True
+        else: # Variable is not live at exit, probably dead code
+            changed = True
+            canbemoved = True
+        if canbemoved:
+            block = basic_blocks[idx]
+            block.remove_ins(inv)
+            if len(block.instructions) == 0:
+                # Mark the block for removal
+                removeblocks.append(block)
+            preheader.append_ins(inv)
     if len(removeblocks) > 0:
-        for block in removeblocks:
-            basic_blocks.remove(block)
-
-        # Now all the cfg information is invalid
-        # So lets rebuild them
-        cfg = bb_to_cfg(basic_blocks)
-
-        # Rebulid the dominator tree
-        dom = find_dominators(cfg, basic_blocks)
-
-        # Rebulid the back edges list
-        back_edges = find_back_edges(cfg, dom)
-
-        # Finally, rebuild the loops
-        loops = []
-        for be in back_edges:
-            loops.append(get_natural_loop(cfg, be[0], be[1]))
+        basic_blocks, cfg, dom, back_edges, loops = remove_blocks(removeblocks, basic_blocks)
         print "New loops :", loops
 
     if changed:
@@ -536,6 +610,9 @@ class BasicBlock(object):
         # The set of live variables
         # at the end of the block
         self.outliveset = None
+        # To mark the node as reachable
+        self.reachable = False
+
 
     def __repr__(self):
         s = 'BasicBlock : {\n'
@@ -661,10 +738,11 @@ class BasicBlock(object):
                 for target in self.targetof:
                     target.destinations.remove(self)
                     target.destinations.extend(self.destinations)
-                    for dest in block.destinations:
-                        dest.targetof.remove(self)
+                    for dest in self.destinations:
+                        dest.targetof.pop(self, None)
                         dest.targetof[target] = self.targetof[target]
         self.instructions.remove(inv)
+        #print self.instructions
 
     # Append an instruction to the block
     # If there is only one instruction in the block,
@@ -677,6 +755,7 @@ class BasicBlock(object):
     def append_ins(self, inv):
         # Check whether it is going to be the leader of the
         # preheader
+        inv.targetof = {}
         if len(self.instructions) == 1:
             inv.targetof = self.instructions[0].targetof
             # Reset the targets to point to the next instruction
@@ -687,3 +766,26 @@ class BasicBlock(object):
                     target.else_destination_ins = inv
         # FINALLY, insert it to the last but one position of the preheader
         self.instructions.insert(len(self.instructions) - 1, inv)
+
+    # Check whether a variable is active
+    # in outliveset, otherwise remove
+    # its definition
+    def eliminate_dead_code(self):
+        toremove = []
+        isempty = self.outliveset == None or len(self.outliveset) == 0
+        for ins in self.instructions:
+            if ins.lhs != None:
+                if isempty or ins.lhs.sid not in self.outliveset:
+                    toremove.append(ins)
+        for tr in toremove:
+            self.remove_ins(tr)
+
+    # If there is only one unconditional
+    # jump in this block, remove that
+    def eliminate_only_goto(self):
+        if len(self.instructions) == 1:
+            prob = self.instructions[0]
+            if prob.lhs == None and prob.rhs == None and prob.destination_ins != None:
+                self.remove_ins(prob)
+                return True
+        return False
