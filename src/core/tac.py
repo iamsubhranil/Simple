@@ -162,7 +162,7 @@ class Var(Atom):
         ret = True
         count = 0
         inloop = False
-        print get_string(self.sid), "->", inreachset,
+        print get_string(self.sid), "->", #inreachset,
         defs = []
         for vardef in inreachset: # For every reaching definition
             if vardef.lhs == self: # Definition of present variable
@@ -170,15 +170,20 @@ class Var(Atom):
                 count = count + 1
 
         for vardef in defs:
+            print vardef,
             for block in loop: # Search for it in the loop block
                 if vardef in block.instructions: # There is a definition of the variable inside the loop
+                    print "[in loop]",
                     inloop = True
-                    print "Declared", get_string(self.sid), " in loop, count :", count
+                    #print "Declared", get_string(self.sid), " in loop, count :", count
                     if count > 1: # There is more than one definition of it
                         self.last_loop_variancy[id(loop)] = False
                         print "False [more than one definition and inside loop]"
                         return False
                     ret = ret and vardef.rhs.is_loop_invariant(inreachset, loop)
+                    break # go for the next one
+            if not inloop:
+                print "[not in loop]",
         if not inloop: # The variable was not defined inside the loop, it is invariant
             print "True [defined outside of the loop]"
             self.last_loop_variancy[id(loop)] = True
@@ -580,6 +585,6 @@ class Tac(object):
     def is_loop_invariant(self, inreachset, loop):
         if self.lhs is not None and self.rhs is not None:
             print "From tac :", self #, inreachset
-            return self.rhs.is_loop_invariant(inreachset, loop) #and self.rhs.is_loop_invariant(inreachset, loop)
+            return self.lhs.is_loop_invariant(inreachset, loop) #and self.rhs.is_loop_invariant(inreachset, loop)
             #return self.last_invariancy_status
         return False

@@ -270,19 +270,19 @@ def find_dominators(cfg, basic_blocks):
     domtree = [None] * lenb
     i = 0
     while i < lenb:
-    domtree[i] = ['None'] * lenb
-    dc = set(dom[i])
-    if i == 0:
-    i = i + 1
-    continue
-    dc.remove(i)
-    if i != 0:
-    dc.remove(0)
-    if len(dc) == 0:
-    domtree[0][i] = 1
-    else:
-    domtree[max(dc)][i] = 1
-    i = i + 1
+        domtree[i] = ['None'] * lenb
+        dc = set(dom[i])
+        if i == 0:
+            i = i + 1
+            continue
+        dc.remove(i)
+        if i != 0:
+            dc.remove(0)
+        if len(dc) == 0:
+            domtree[0][i] = 1
+        else:
+            domtree[max(dc)][i] = 1
+        i = i + 1
 
     print "Domtree :", domtree
     view_cfg(domtree, basic_blocks)
@@ -699,7 +699,7 @@ class BasicBlock(object):
     def find_loop_invariants(self, loop):
         loop_invariants = []
         for i in self.instructions:
-            print "From block :", self.insreachset[i]
+            #print "From block :", self.insreachset[i]
             if i.is_loop_invariant(self.insreachset[i], loop):
                 loop_invariants.append(i)
         return loop_invariants

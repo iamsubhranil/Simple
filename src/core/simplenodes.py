@@ -182,7 +182,8 @@ class AssignmentStatement(Statement):
 
     def compile(self):
         s = Var(self.assignee.sid)
-        t = self.assignment.compile()
+        print self.assignment.__class__
+        t = self.assignment.compile(True) # dontassign = True
         tac = Tac()
         tac.lhs = s
         tac.rhs = t
@@ -390,7 +391,13 @@ class Expression(object):
         raise
 
     # Should be overridden
-    def compile(self):
+    # dontassign denotes whether or
+    # not the expression will
+    # automatically be assigned
+    # to a temporary variable
+    # and the variable will be
+    # returned
+    def compile(self, dontassign = False):
         raise
 
     # Should be overridden
@@ -419,7 +426,7 @@ class ConstantExpression(Expression):
     def is_constant(self):
         return True
 
-    def compile(self):
+    def compile(self, dontassign = False):
         return Const(self.value)
 
     def eval(self):
@@ -464,16 +471,19 @@ class BinaryExpression(Expression):
     def eval(self):
         return self.function(self.left.eval(), self.right.eval())
 
-    def compile(self):
+    def compile(self, dontassign = False):
         t1 = self.left.compile()
         t2 = self.right.compile()
         t3 = BinOp(t1, t2, self.opstring)
-        t = Var(register_string(get_temp_var()))
-        tac = Tac()
-        tac.lhs = t
-        tac.rhs = t3
-        ins_append(tac)
-        return t
+        if not dontassign:
+            t = Var(register_string(get_temp_var()))
+            tac = Tac()
+            tac.lhs = t
+            tac.rhs = t3
+            ins_append(tac)
+            return t
+        else:
+            return t3
 
     def validate(self):
         self.left.validate()
@@ -520,15 +530,18 @@ class UnaryExpression(Expression):
     def eval(self):
         return self.function(self.right.eval())
 
-    def compile(self):
+    def compile(self, dontassign = False):
         t1 = self.right.compile()
         t = Var(register_string(get_temp_var()))
         u = UnOp(t1, self.opstring)
-        tac = Tac()
-        tac.lhs = t
-        tac.rhs = u
-        ins_append(tac)
-        return t
+        if not dontassign:
+            tac = Tac()
+            tac.lhs = t
+            tac.rhs = u
+            ins_append(tac)
+            return t
+        else:
+            return u
 
     def validate(self):
         self.right.validate()
@@ -574,7 +587,7 @@ class VariableExpression(Expression):
         else:
             return self
 
-    def compile(self):
+    def compile(self, dontassign = False):
         return Var(self.sid)
 
     def validate(self):
