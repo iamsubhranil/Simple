@@ -12,6 +12,9 @@ from simplecfg import find_basic_blocks, bb_to_cfg, print_cfg, view_cfg, \
     insert_preheader, optimize_loop_invariants, find_live_variables, \
     eliminate_dead_code, rebuild_all, eliminate_dead_blocks
 
+import os
+os.environ['PYGAME_HIDE_SUPPORT_PROMPT'] = "hide"
+
 def disp(s):
     print s,
 
@@ -272,7 +275,7 @@ class KoolAstGen(object):
         s = float(node.children[0].additional_info
                   + "." +
                   node.children[2].additional_info)
-        return ConstantExpression(self.context, s, float)
+        return ConstantExpression(self.context, float(s), float)
 
     def visit_DECIMAL(self, node):
         return ConstantExpression(self.context, int(node.additional_info), int)
@@ -364,10 +367,10 @@ def entry_point(argv):
             print "===================="
             basic_blocks, cfg, dom, back_edges, loops = insert_preheader(cfg, basic_blocks, loops, i)
 
-            print "\nAfter Initializing preheader"
-            print "============================"
-            print_cfg(cfg, basic_blocks)
-            view_cfg(cfg, basic_blocks)
+            #print "\nAfter Initializing preheader"
+            #print "============================"
+            #print_cfg(cfg, basic_blocks)
+            #view_cfg(cfg, basic_blocks)
             i = i + 1
 
         print "\nReaching definitions"
@@ -396,9 +399,31 @@ def entry_point(argv):
 
         i = 0
         while i < len(loops):
-            print "\nSearching for loop invariants (loop:", loops[i], ")"
+            print "\nOptimizing loop invariants (loop:", loops[i], ")"
             print "=============================="
             basic_blocks, cfg, dom, back_edges, loops = optimize_loop_invariants(cfg, basic_blocks, dom, back_edges, loops, i)
+            i = i + 1
+
+        print "\nReevaluating dataflow"
+        print "=====================\n"
+        find_reaching_definitions(cfg, basic_blocks)
+        find_available_expressions(cfg, basic_blocks)
+        find_live_variables(cfg, basic_blocks)
+
+        i = 0
+        while i < len(loops):
+            print "\nSearching for induction variables (loop:", loops[i], ")"
+            print "==================================="
+            var = []
+            lp = []
+            for bi in loops[i]:
+                lp.append(basic_blocks[bi])
+            for bi in loops[i]:
+                var.append(basic_blocks[bi].find_induction_variables(lp))
+            print "Induction variables :", #var,
+            for v in var:
+                for w in v:
+                    print get_string(w[0]),
             i = i + 1
 
         optimization("Common Subexpression Elimination", 1, cfg, basic_blocks, lambda x : x.eliminate_cse())

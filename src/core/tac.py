@@ -196,6 +196,26 @@ class Var(Atom):
         self.last_loop_variancy[id(loop)] = False
         return False # None of them holds
 
+    def is_induction_variable(self, inreachset, loop):
+        count = 0
+        ret = False
+        for vardef in inreachset:
+            if vardef.lhs.sid == self.sid: # Find reaching definitions
+                for block in loop:
+                    if vardef in block.instructions: # For all definitions of self in block
+                        if count == 0: # Only definition
+                            count = count + 1
+                            rhs = vardef.rhs
+                            if isinstance(rhs, BinOp): # rhs is a binary operation
+                                if rhs.op == '+': # only + for now
+                                    if rhs.left == self: # i = i + <loop_invariant>
+                                        ret = rhs.right.is_loop_invariant(inreachset, loop)
+                                    elif rhs.right == self: # i = <loop_invariant> + i
+                                        ret = rhs.left.is_loop_invariant(inreachset, loop)
+                        else:
+                            return False
+        return ret
+
     def get_used(self):
         return set([self.sid])
 

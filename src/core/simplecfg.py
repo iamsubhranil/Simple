@@ -789,3 +789,14 @@ class BasicBlock(object):
                 self.remove_ins(prob)
                 return True
         return False
+
+    # Find all induction variables in the
+    # block
+    def find_induction_variables(self, loop):
+        loop_invariants = self.find_loop_invariants(loop)
+        iv = []
+        for ins in self.instructions:
+            if ins.lhs != None:
+                if ins.lhs.is_induction_variable(self.insreachset[ins], loop):
+                    iv.append((ins.lhs.sid, 1, 0)) # induction triplet, i = i*1 + <loop_invariant>
+        return iv
