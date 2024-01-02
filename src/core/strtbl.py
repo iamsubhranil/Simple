@@ -1,4 +1,4 @@
-from rpython.rlib.rmd5 import md5
+from hashlib import md5
 
 class StringTable(object):
 
@@ -7,13 +7,11 @@ class StringTable(object):
         self.stringhashlist = []
 
 strtable = StringTable()
-md5ins = md5()
 
 def register_string(string):
     assert isinstance(string, str)
     global strtable
-    md5ins.input = string
-    hval = md5ins.hexdigest()
+    hval = md5(string).hexdigest()
     if hval not in strtable.stringtable:
         strtable.stringtable[hval] = string
         s = len(strtable.stringhashlist)
