@@ -349,6 +349,79 @@ class WhileStatement(Statement):
         return s
 
 
+class ForStatement(Statement):
+
+    def __init__(self, context, init, cond, incr, block):
+        self.name = 'ForStatement'
+        self.context = context
+        self.init = init
+        self.cond = cond
+        self.incr = incr
+        self.block = block
+
+    def optimize(self):
+        if self.init:
+            self.init = self.init.optimize()
+        if self.cond:
+            self.cond = self.cond.optimize()
+        if self.incr:
+            self.incr = self.incr.optimize()
+        self.block.optimize()
+
+    def validate(self):
+        if self.init:
+            self.init.validate()
+        if self.cond:
+            self.cond.validate()
+        if self.incr:
+            self.incr.validate()
+        if self.cond == None or check_if_bool(self.cond):
+            self.block.validate()
+        else:
+            raise ValidationException("Condition must be boolean")
+
+    def compile(self):
+        # compile the init expression
+        if self.init:
+            self.init.compile()
+        l = get_temp_label()
+        l2 = get_temp_label()
+        # Generate, but don't append yet
+        # the unconditional jump to the
+        # start of the block
+        ujmp = Tac()
+        ujmp.destination = l
+        # Mark the condition with label l
+        pending_labels.append((l, ujmp))            #
+        t = ConstantExpression(self.context, True, bool) #
+        if self.cond:                               #
+            t = self.cond.compile()                 # <---------|
+        l1 = get_temp_label()                       #           |
+        # Generate the conditional jump             #           |
+        # either to the then block or               #           |
+        # out of the loop                           #           |
+        cjmp = Tac()                                #           |
+        cjmp.destination = l1                       # ----|     | Cond Reeval.
+        cjmp.else_destination = l2                  # ----+-|   |
+        cjmp.rhs = t                                #     | |   |
+        ins_append(cjmp)                            #     | |   |
+        # Mark the start of the then block          #     | |   |
+        # with l1                                   #     | |   |
+        pending_labels.append((l1, cjmp))           #     | |   |
+        self.block.compile()                        #     | |   |
+        # now compile the incr                      #     | |   |
+        if self.incr:                               #     | |   |
+            self.incr.compile()                     # <---| |   |
+        # Now append the unconditional jump         #       |   |
+        # to the loop header we generated earlier   #       |   |
+        ins_append(ujmp)                            # ------+---|
+        # Mark the end of the loop with l2          #       | Jump to end
+        pending_labels.append((l2, cjmp, True))     # <-----|
+
+    def __repr__(self):
+        s = 'for (' + str(self.init) + ';' + str(self.cond) + ';' + str(self.incr) + ') {\n' + str(self.block) + '\n}'
+        return s
+
 class BlockStatement(Statement):
 
     def __init__(self, context):

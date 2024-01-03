@@ -1,6 +1,6 @@
 var result = 0
 
-do {
+while (result * 32 > result * result) {
     for (var a = 1; a <= 5; a = a + 1) {
         var b = a + 5
         var c = a * 3
@@ -9,7 +9,7 @@ do {
         var e = 0
         while (e < a * 3) {
             var f = e + a
-            var g = e % 3
+            var g = e ^ 3
             var h = f * g
 
             result = h + d
@@ -23,7 +23,7 @@ do {
                     j = result * 3
                     k = j + 2
 
-                    for (l = 0; l < 2; l = l + 1) {
+                    for (var l = 0; l < 2; l = l + 1) {
                         var m = l * 2
                         var n = m + j
                         result = n * 4
@@ -84,10 +84,10 @@ do {
             w = w + 1
         }
     }
-} while (result * 32 > result * result)
+}
 
 var aa = 8, bb
-if (aa % 2 == 0) {
+if (aa ^ 2 == 0) {
     bb = aa * 3
 } else {
     bb = aa + 5

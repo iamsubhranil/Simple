@@ -86,6 +86,19 @@ class KoolAstGen(object):
         then = node.children[1].visit(self)
         return WhileStatement(self.context, cond, then)
 
+    def visit_forstmt(self, node):
+        init = None
+        cond = None
+        incr = None
+        if node.children[0]:
+            init = node.children[0].visit(self)
+        if node.children[1]:
+            cond = node.children[1].visit(self)
+        if node.children[2]:
+            incr = node.children[2].visit(self)
+        block = node.children[3].visit(self)
+        return ForStatement(self.context, init, cond, incr, block)
+
     def visit_ifstmt(self, node):
         exp = node.children[0].visit(self)
         then = node.children[1].visit(self)

@@ -268,6 +268,31 @@ def generate_if(tokens):
         children.append(generate_stmt(tokens))
     return Nonterminal('ifstmt', children)
 
+def generate_for(tokens):
+    tokens.pop(0)
+    expect(tokens, 'PAREN_OPEN')
+    children = []
+    if tokens[0].name != 'SEMICOLON':
+        if tokens[0].name == 'VAR':
+            children.append(generate_var_decl_list(tokens))
+        else:
+            children.append(generate_exprstmt(tokens))
+    else:
+        children.append(None)
+    expect(tokens, 'SEMICOLON')
+    if tokens[0].name != 'SEMICOLON':
+        children.append(generate_logic_or(tokens))
+    else:
+        children.append(None)
+    expect(tokens, 'SEMICOLON')
+    if tokens[0].name != 'PAREN_CLOSE':
+        children.append(generate_exprstmt(tokens))
+    else:
+        children.append(None)
+    expect(tokens, 'PAREN_CLOSE')
+    children.append(generate_stmt(tokens))
+    return Nonterminal('forstmt', children)
+
 def generate_block(tokens):
     tokens.pop(0)
     children = []
@@ -286,6 +311,8 @@ def generate_stmt(tokens):
         child.append(generate_var_decl_list(tokens))
     elif tokens[0].name == 'CURL_OPEN':
         child.append(generate_block(tokens))
+    elif tokens[0].name == 'FOR':
+        child.append(generate_for(tokens))
     else:
         child.append(generate_exprstmt(tokens))
     return Nonterminal('stmt', child)
