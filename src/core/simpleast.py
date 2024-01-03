@@ -219,7 +219,7 @@ def optimization(name, phase, cfg, basic_blocks, function):
         print("\nCFG (adjacency matrix)")
         print("=======================\n")
         print_cfg(cfg, basic_blocks)
-        view_cfg(cfg, basic_blocks)
+        view_cfg(cfg, basic_blocks, name)
 
 def entry_point(argv):
     # parser, lexer, transformer = make_kool_parser()

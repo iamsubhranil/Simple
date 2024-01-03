@@ -119,8 +119,8 @@ def print_cfg(cfg, basic_blocks):
 
 def view_cfg(cfg, basic_blocks, name = "CFG"):
     from dotviewer import graphclient
-    import py
-    content = ['digraph '+ name + '{']
+    import graphcontentpage
+    content = ['digraph "'+ name + '" {']
     i = 0
     for blk in cfg:
         s = '"%s" [label="%s"];\n' % (i, basic_blocks[i].get_label())
@@ -139,17 +139,7 @@ def view_cfg(cfg, basic_blocks, name = "CFG"):
     content.extend(block.view())
     """
     content.append("\n}")
-    #print content
-    try:
-        p = py.test.ensuretemp("automaton").join("temp.dot")
-        remove = False
-    except AttributeError: # pytest lacks ensuretemp, make a normal one
-        p = py.path.local.mkdtemp().join('automaton.dot')
-        remove = True
-        p.write("\n".join(content))
-        graphclient.display_dot_file(str(p))
-        if remove:
-            p.dirpath().remove
+    graphclient.display_page(graphcontentpage.GraphContentPage("\n".join(content)))
 
 def find_reaching_definitions(cfg, basic_blocks):
     out = []

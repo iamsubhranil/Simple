@@ -1,7 +1,3 @@
-import py
-
-import os
-os.environ['PYGAME_HIDE_SUPPORT_PROMPT'] = "hide"
 class Token(object):
     def __init__(self, name, source, source_pos):
         self.name = name
@@ -46,19 +42,11 @@ class SourcePos(object):
 class Node(object):
     def view(self):
         from dotviewer import graphclient
+        from graphcontentpage import GraphContentPage
         content = ["digraph G{"]
         content.extend(self.dot())
         content.append("}")
-        try:
-            p = py.test.ensuretemp("automaton").join("temp.dot")
-            remove = False
-        except AttributeError: # pytest lacks ensuretemp, make a normal one
-            p = py.path.local.mkdtemp().join('automaton.dot')
-            remove = True
-        p.write("\n".join(content))
-        graphclient.display_dot_file(str(p))
-        if remove:
-            p.dirpath().remove()
+        graphclient.display_page(GraphContentPage("\n".join(content)))
 
 class Symbol(Node):
 
@@ -313,6 +301,8 @@ def generate_program(tokens):
 
 if __name__ == "__main__":
     import sys
+    import os
+    os.environ['PYGAME_HIDE_SUPPORT_PROMPT'] = "hide"
     name = sys.argv[1]
     with open(name, "r") as f:
         tokens = lex(f.read())
