@@ -75,165 +75,98 @@ class KoolAstGen(object):
     def visit_program(self, node):
         p = Program(self.context)
         for child in node.children:
-            p.statements.append(self.visit_stmt(child))
+            p.statements.append(child.visit(self))
         return p
 
     def visit_stmt(self, node):
-        child = node.children[0]
-        if child.symbol == 'var_decl_list':
-            return self.visit_var_decl_list(child)
-        elif child.symbol == 'exprstmt':
-            return self.visit_expr_stmt(child)
-        elif child.symbol == 'ifstmt':
-            return self.visit_ifstmt(child)
-        elif child.symbol == 'whilestmt':
-            return self.visit_whilestmt(child)
-        elif child.symbol == 'block':
-            return self.visit_block(child)
+        return node.children[0].visit(self)
 
     def visit_whilestmt(self, node):
-        cond = self.visit_logic_or(node.children[0])
-        then = self.visit_stmt(node.children[1])
+        cond = node.children[0].visit(self)
+        then = node.children[1].visit(self)
         return WhileStatement(self.context, cond, then)
 
     def visit_ifstmt(self, node):
-        exp = self.visit_logic_or(node.children[0])
-        then = self.visit_stmt(node.children[1])
+        exp = node.children[0].visit(self)
+        then = node.children[1].visit(self)
         elsest = None
         if len(node.children) == 3:
-            elsest = self.visit_stmt(node.children[2])
+            elsest = node.children[2].visit(self)
         return IfStatement(self.context, exp, then, elsest)
 
     def visit_block(self, node):
         b = BlockStatement(self.context)
         for child in node.children:
-            b.statements.append(self.visit_stmt(child))
+            b.statements.append(child.visit(self))
         return b
 
-    def visit_expr_stmt(self, node):
+    def visit_exprstmt(self, node):
         e = ExpressionStatement(self.context)
         for child in node.children:
-            e.exprs.append(self.visit_assignment(child))
+            e.exprs.append(child.visit(self))
         return e
 
     def visit_var_decl_list(self, node):
         e = ExpressionStatement(self.context)
         for child in node.children:
-            j = self.visit_var_decl(child)
+            j = child.visit(self)
             if j is not None:
                 e.exprs.append(j)
         return e
 
     def visit_var_decl(self, node):
-        s, pos = self.visit_IDENTIFIER(node.children[0])
+        s, pos = node.children[0].visit(self)
         self.context.declare(s, pos)
         if len(node.children) == 2:
             #disp(" = ")
-            exp = self.visit_logic_or(node.children[1])
+            exp = node.children[1].visit(self)
             self.context.update_assignment(s, exp, pos)
             ve = VariableExpression(self.context, s, pos)
             return AssignmentStatement(self.context, pos, ve, exp)
         return None
 
     def visit_assignment(self, node):
-        i, pos = self.visit_IDENTIFIER(node.children[0])
-        j = self.visit_logic_or(node.children[1])
+        i, pos = node.children[0].visit(self)
+        j = node.children[1].visit(self)
         ve = VariableExpression(self.context, i, pos)
         return AssignmentStatement(self.context, pos, ve, j)
 
     def visit_IDENTIFIER(self, node):
         return register_string(node.additional_info.strip()), node.token.source_pos
 
-    def visit_logic_or(self, node):
-        j = self.visit_logic_and(node.children[0])
+    def visit_binary(self, node):
+        j = node.children[0].visit(self)
         i = 1
         while i < len(node.children):
-            k = self.visit_logic_and(node.children[i + 1])
+            k = node.children[i + 1].visit(self)
             sym = node.children[i].symbol
-            validator = self.validators['OR']
-            rt = self.return_type['OR']
+            validator = self.validators[sym]
+            rt = self.return_type[sym]
             #function = self.function['OR']
             j = BinaryExpression(self.context, j, k, rt, validator, node.children[i].additional_info)
             i = i + 2
         return j
 
+    def visit_logic_or(self, node):
+        return self.visit_binary(node)
+
     def visit_logic_and(self, node):
-        j = self.visit_equality(node.children[0])
-        i = 1
-        while i < len(node.children):
-            k = self.visit_equality(node.children[i + 1])
-            sym = node.children[i].symbol
-            validator = self.validators['AND']
-            rt = self.return_type['AND']
-            #function = self.function['AND']
-            j = BinaryExpression(self.context, j, k, rt, validator, node.children[i].additional_info)
-            i = i + 2
-        return j
+        return self.visit_binary(node)
 
     def visit_equality(self, node):
-        j = self.visit_comparison(node.children[0])
-        i = 1
-        while i < len(node.children):
-            k = self.visit_comparison(node.children[i + 1])
-            sym = node.children[i].symbol
-            validator = self.validators[sym]
-            rt = self.return_type[sym]
-            #function = self.function[sym]
-            j = BinaryExpression(self.context, j, k, rt, validator, node.children[i].additional_info)
-            i = i + 2
-        return j
+        return self.visit_binary(node)
 
     def visit_comparison(self, node):
-        j = self.visit_add(node.children[0])
-        i = 1
-        while i < len(node.children):
-            k = self.visit_add(node.children[i + 1])
-            sym = node.children[i].symbol
-            validator = self.validators[sym]
-            rt = self.return_type[sym]
-            #function = self.function[sym]
-            j = BinaryExpression(self.context, j, k, rt, validator, node.children[i].additional_info)
-            i = i + 2
-        return j
+        return self.visit_binary(node)
 
     def visit_add(self, node):
-        j = self.visit_mult(node.children[0])
-        i = 1
-        while i < len(node.children):
-            k = self.visit_mult(node.children[i + 1])
-            sym = node.children[i].symbol
-            validator = self.validators[sym]
-            rt = self.return_type[sym]
-            #function = self.function[sym]
-            j = BinaryExpression(self.context, j, k, rt, validator, node.children[i].additional_info)
-            i = i + 2
-        return j
+        return self.visit_binary(node)
 
     def visit_mult(self, node):
-        j = self.visit_power(node.children[0])
-        i = 1
-        while i < len(node.children):
-            k = self.visit_power(node.children[i + 1])
-            sym = node.children[i].symbol
-            validator = self.validators[sym]
-            rt = self.return_type[sym]
-            #function = self.function[sym]
-            j = BinaryExpression(self.context, j, k, rt, validator, node.children[i].additional_info)
-            i = i + 2
-        return j
+        return self.visit_binary(node)
 
     def visit_power(self, node):
-        j = self.visit_unary(node.children[0])
-        i = 1
-        while i < len(node.children):
-            k = self.visit_unary(node.children[i + 1])
-            sym = node.children[i].symbol
-            validator = self.validators[sym]
-            rt = self.return_type[sym]
-            #function = self.function[sym]
-            j = BinaryExpression(self.context, j, k, rt, validator, node.children[i].additional_info)
-            i = i + 2
-        return j
+        return self.visit_binary(node)
 
     def visit_unary(self, node):
         i = None
@@ -241,33 +174,25 @@ class KoolAstGen(object):
             if isinstance(child, Symbol):
                 i = UnaryExpression(self.context, i, self.return_type[child.symbol], \
                     self.validators[child.symbol], child.additional_info)
-            elif child.symbol == 'unary':
-                i = self.visit_unary(child)
             else:
-                i = self.visit_primary(child)
+                i = child.visit(self)
         return i
 
     def visit_primary(self, node, refd = 0):
-        for child in node.children:
-            if child.symbol == 'IDENTIFIER':
-                s, pos = self.visit_IDENTIFIER(child)
-                return VariableExpression(self.context, s, pos)
-            elif child.symbol == 'number':
-                return self.visit_number(child)
-            elif child.symbol == 'TRUE':
-                return ConstantExpression(self.context, True, bool)
-            elif child.symbol == 'FALSE':
-                return ConstantExpression(self.context, False, bool)
-                #disp("\nLOAD_SUPER ")
-                #self.visit_call(child.children[0])
-            else:
-                return self.visit_logic_or(child)
+        child = node.children[0]
+        if child.symbol == 'IDENTIFIER':
+            s, pos = self.visit_IDENTIFIER(child)
+            return VariableExpression(self.context, s, pos)
+        return child.visit(self)
+
+    def visit_FALSE(self, node):
+        return ConstantExpression(self.context, False, bool)
+
+    def visit_TRUE(self, node):
+        return ConstantExpression(self.context, True, bool)
 
     def visit_number(self, node):
-        if node.children[0].symbol == 'float':
-            return self.visit_float(node.children[0])
-        else:
-            return self.visit_DECIMAL(node.children[0])
+        return node.children[0].visit(self)
 
     def visit_float(self, node):
         s = float(node.children[0].additional_info
