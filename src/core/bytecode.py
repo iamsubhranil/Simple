@@ -1,8 +1,6 @@
 import struct
 import array
 
-from rpython.rlib.objectmodel import we_are_translated
-
 def enum(*sequential, **named):
     enums = dict(zip(sequential, range(len(sequential))), **named)
     reverse = dict((value, key) for key, value in enums.iteritems())
@@ -144,14 +142,11 @@ class Disassembler(object):
                 print " " * 50,
             op = self.bo.next_byte()
             s = str(opcode.string_of[op])
-            if not we_are_translated():
-                print "%3d" % (self.bo.pos - 1), " : ", "%-20s" % s, " ",
-            else:
-                print self.bo.pos - 1, " : ", s, " ",
+            print "%3d" % (self.bo.pos - 1), " : ", "%-20s" % s, " ",
             if not s.startswith('ARITH') \
             and not s.startswith('RETURN') \
             and not s.startswith('LOGIC'):
-                if not we_are_translated():
+                if True:
                     fn = getattr(self, "handle_" + s)
                     fn()
                 else:
@@ -301,9 +296,7 @@ class Bytecode2:
     def next_int(self):
         v = self.next_value()
         # print v
-        if not we_are_translated():
-            assert isinstance(v, int)
-            return v
+        assert isinstance(v, int)
         return int(v)
 
     def get_int(self, pos):

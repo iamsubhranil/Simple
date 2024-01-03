@@ -1,9 +1,7 @@
-from rpython.rlib.parsing.parsing import *
-from rpython.rlib.parsing.ebnfparse import *
-from rpython.rlib.parsing.lexer import *
 import sys
 
-from lexpar import parser, lexer, KoolToAST
+import lexer
+from lexer import Symbol, Nonterminal, Token
 from strtbl import get_string, register_string
 from simplenodes import *
 from simplecfg import find_basic_blocks, bb_to_cfg, print_cfg, view_cfg, \
@@ -303,24 +301,16 @@ def entry_point(argv):
     disp("Initializing..\n")
     f = open(argv[1], "r")
     source = f.read()
-    tokens = lexer.tokenize(source, True)
-    if not we_are_translated():
-        disp("\nTokens : ")
-        disp(str(tokens))
+    tokens = lexer.lex(source)
+    disp("\nTokens : ")
+    disp(str(tokens))
     disp("\n\n")
     try:
-        nt = parser.parse(tokens, False)
-        if not we_are_translated():
-            disp("ParseTree : ")
-            disp(str(nt))
-            disp("\n\n")
-        res = KoolToAST()
-        res = res.transform(nt)
-        if not we_are_translated():
-            disp("TransformedTree : ")
-            disp(str(res))
-            res.view()
-            disp("\n\n")
+        res = lexer.generate_program(tokens)
+        disp("TransformedTree : ")
+        disp(str(res))
+        res.view()
+        disp("\n\n")
         cg = KoolAstGen()
         program = cg.visit_program(res)
         program.validate()
@@ -474,12 +464,9 @@ def entry_point(argv):
         print_cfg(cfg, basic_blocks)
         view_cfg(cfg, basic_blocks)
 
-    except ParseError as e:
+    except RuntimeError as e:
         disp("\n\n")
-        if we_are_translated():
-            disp(e.nice_error_message())
-        else:
-            disp(e.nice_error_message(f.name, source))
+        disp(e.nice_error_message(f.name, source))
     print "\nExecution completed!"
     return 0
 
