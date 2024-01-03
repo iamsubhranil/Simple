@@ -240,7 +240,7 @@ def generate_assignment(tokens):
     return Nonterminal('assignment', children)
 
 def generate_exprstmt(tokens):
-    return generate_nonterminal_binary(tokens, 'COMMA', generate_assignment, 'exprstmt', 'SEMICOLON')
+    return generate_nonterminal_binary(tokens, 'COMMA', generate_assignment, 'exprstmt')
 
 def generate_var_decl(tokens):
     children = [Symbol(expect(tokens, 'IDENTIFIER'))]
@@ -251,7 +251,7 @@ def generate_var_decl(tokens):
 
 def generate_var_decl_list(tokens):
     tokens.pop(0)
-    return generate_nonterminal_binary(tokens, 'COMMA', generate_var_decl, 'var_decl_list', 'SEMICOLON')
+    return generate_nonterminal_binary(tokens, 'COMMA', generate_var_decl, 'var_decl_list')
 
 def generate_while(tokens):
     tokens.pop(0)

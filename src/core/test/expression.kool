@@ -1,18 +1,18 @@
-var n = 10000, i = 2, numprimediv = 0;
+var n = 10000, i = 2, numprimediv = 0
 while (i < n/2){
-    var j = n/i;
+    var j = n/i
     if (n == j*i){
-        var divisor = i, k = 2, isprime = true;
+        var divisor = i, k = 2, isprime = true
         while(k < i/2){
-            var l = i / k;
+            var l = i / k
             if(i == l*k){
-                isprime = false;
+                isprime = false
             }
-            k = k + 1;
+            k = k + 1
         }
         if isprime{
-            numprimediv = numprimediv + 1;
+            numprimediv = numprimediv + 1
         }
     }
-    i = i + 1;
+    i = i + 1
 }

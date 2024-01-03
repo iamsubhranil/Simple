@@ -1,11 +1,11 @@
-var a = 10, b = 20, c = 30, d = 40;
+var a = 10, b = 20, c = 30, d = 40
 while a > 0 {
     while b > 0{
         while c > 0{
             while d > 0{
-                a = a + 1;
-                b = b + 2;
-                c = d;
+                a = a + 1
+                b = b + 2
+                c = d
             }
         }
     }

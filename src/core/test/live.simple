@@ -1,8 +1,8 @@
-var a = 5, b = 6;
+var a = 5, b = 6
 while b > 0{
     if b == 3{
-        a = 6;
+        a = 6
     }
-    b = b - 4;
+    b = b - 4
 }
-var d = a;
+var d = a

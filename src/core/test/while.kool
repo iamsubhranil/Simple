@@ -1,5 +1,5 @@
-var a = 0;
+var a = 0
 while a < 10000 {
-    a = a + 1;
-    var d = a;
+    a = a + 1
+    var d = a
 }
