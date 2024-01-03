@@ -2,8 +2,8 @@ import struct
 import array
 
 def enum(*sequential, **named):
-    enums = dict(zip(sequential, range(len(sequential))), **named)
-    reverse = dict((value, key) for key, value in enums.iteritems())
+    enums = dict(list(zip(sequential, list(range(len(sequential))))), **named)
+    reverse = dict((value, key) for key, value in enums.items())
     enums['string_of'] = reverse
     return type('Enum', (), enums)
 # The frame will contain a symbol table, and a string
@@ -108,17 +108,17 @@ opcode = enum(
 
 def source_highlight(source, source_pos, print_newline):
     if source is not None and source_pos is not None:
-        print source.split('\n')[source_pos.lineno]
+        print(source.split('\n')[source_pos.lineno])
         if source_pos.columnno == 0:
             if print_newline == 1:
-                print "^"
+                print("^")
             else:
-                print "^",
+                print("^", end=' ')
         else:
             if print_newline == 1:
-                print " " * (source_pos.columnno - 1), "^"
+                print(" " * (source_pos.columnno - 1), "^")
             else:
-                print " " * (source_pos.columnno - 1), "^",
+                print(" " * (source_pos.columnno - 1), "^", end=' ')
 
 class Disassembler(object):
 
@@ -130,7 +130,7 @@ class Disassembler(object):
     def highlight(self, source_pos):
         if self.source is not None:
             source_highlight(self.source, source_pos, 0)
-            print "-" * (48 - source_pos.columnno),
+            print("-" * (48 - source_pos.columnno), end=' ')
 
     def dis(self):
         bak = self.bo.pos
@@ -139,10 +139,10 @@ class Disassembler(object):
             try:
                 self.highlight(self.bo.debug_info[self.bo.pos])
             except KeyError:
-                print " " * 50,
+                print(" " * 50, end=' ')
             op = self.bo.next_byte()
             s = str(opcode.string_of[op])
-            print "%3d" % (self.bo.pos - 1), " : ", "%-20s" % s, " ",
+            print("%3d" % (self.bo.pos - 1), " : ", "%-20s" % s, " ", end=' ')
             if not s.startswith('ARITH') \
             and not s.startswith('RETURN') \
             and not s.startswith('LOGIC'):
@@ -179,19 +179,19 @@ class Disassembler(object):
                         self.handle_CALL()
                     elif s == 'LOAD_SCOPE':
                         self.handle_LOAD_SCOPE()
-                print
+                print()
             else:
-                print
+                print()
         self.bo.pos = bak
 
     def handle_LOAD_CONSTANT_INT(self):
-        print self.bo.next_int(), ' ',
+        print(self.bo.next_int(), ' ', end=' ')
 
     def handle_LOAD_CONSTANT_FLOAT(self):
-        print self.bo.next_float()
+        print(self.bo.next_float())
 
     def handle_LOAD_CONSTANT_BOOL(self):
-        print self.bo.next_byte()
+        print(self.bo.next_byte())
 
     def handle_LOAD_SLOT(self):
         self.handle_LOAD_CONSTANT_INT()
@@ -327,15 +327,15 @@ if __name__ == "__main__":
     f = b.append_float(32.32)
     from strtbl import register_string, get_string
     i = b.append_int(register_string("Hello World!"))
-    print b
+    print(b)
     b.set_pointer(0)
-    print b.get_int(g)
-    print b.get_float(f)
-    print b.next_byte()
-    print b.next_int()
-    print b.next_float()
-    print get_string(b.get_int(i))
-    print register_string("Hello Kool!"), i
+    print(b.get_int(g))
+    print(b.get_float(f))
+    print(b.next_byte())
+    print(b.next_int())
+    print(b.next_float())
+    print(get_string(b.get_int(i)))
+    print(register_string("Hello Kool!"), i)
     b.insert_int(1, i)
-    print b
-    print get_string(b.get_int(i))
+    print(b)
+    print(get_string(b.get_int(i)))

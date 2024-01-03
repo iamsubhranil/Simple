@@ -30,13 +30,13 @@ def cmgn(s):
     return COLOR_MAGENTA + s + STYLE_RESET
 
 def perr(s):
-    print sbold(cred("[Error] ")) + s
+    print(sbold(cred("[Error] ")) + s)
 
 def pinfo(s):
-    print sbold(cblue("[Info] ")) + s
+    print(sbold(cblue("[Info] ")) + s)
 
 def pwarn(s):
-    print sbold(cylw("[Warning] ")) + s
+    print(sbold(cylw("[Warning] ")) + s)
 
 def pok(s):
-    print sbold(cgrn("[Success] ")) + s
+    print(sbold(cgrn("[Success] ")) + s)

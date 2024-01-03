@@ -99,7 +99,7 @@ class Nonterminal(Node):
             raise
 
     def __str__(self):
-        print(self.symbol, self.children)
+        print((self.symbol, self.children))
         return "%s(%s)" % (self.symbol, ", ".join([str(c) for c in self.children]))
 
     def __repr__(self):
@@ -155,10 +155,10 @@ def lex(contents):
                     lastlineend = i
                     char = 0
                 i += 1
-        elif contents[i] in token_types.keys():
+        elif contents[i] in list(token_types.keys()):
             t = contents[i]
             char = i - lastlineend
-            if i < size and contents[i:i + 2] in token_types.keys():
+            if i < size and contents[i:i + 2] in list(token_types.keys()):
                 t = contents[i:i + 2]
             tokens.append(Token(token_types[t], t, SourcePos(i, line, char)))
             i += len(t)
@@ -317,5 +317,5 @@ if __name__ == "__main__":
     with open(name, "r") as f:
         tokens = lex(f.read())
         tree = generate_program(tokens)
-        print(str(tree))
+        print((str(tree)))
         tree.view()

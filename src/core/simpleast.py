@@ -14,7 +14,7 @@ import os
 os.environ['PYGAME_HIDE_SUPPORT_PROMPT'] = "hide"
 
 def disp(s):
-    print s,
+    print(s, end=' ')
 
 def check_if_number(expr):
     t = expr.return_type()
@@ -279,20 +279,20 @@ class KoolAstGen(object):
         return ConstantExpression(self.context, int(node.additional_info), int)
 
 def optimization(name, phase, cfg, basic_blocks, function):
-        print "\nOptimization (Phase ", str(phase) + ")"
-        print "=======================\n"
-        print name
-        print "=" * len(name), "\n"
+        print("\nOptimization (Phase ", str(phase) + ")")
+        print("=======================\n")
+        print(name)
+        print("=" * len(name), "\n")
         for bb in basic_blocks:
             function(bb)
-        print "\nAfter", name
-        print "=====", "=" * len(name), "\n"
-        print "\nBasic blocks"
-        print "=============\n"
-        print basic_blocks
+        print("\nAfter", name)
+        print("=====", "=" * len(name), "\n")
+        print("\nBasic blocks")
+        print("=============\n")
+        print(basic_blocks)
         cfg = bb_to_cfg(basic_blocks)
-        print "\nCFG (adjacency matrix)"
-        print "=======================\n"
+        print("\nCFG (adjacency matrix)")
+        print("=======================\n")
         print_cfg(cfg, basic_blocks)
         view_cfg(cfg, basic_blocks)
 
@@ -314,47 +314,47 @@ def entry_point(argv):
         cg = KoolAstGen()
         program = cg.visit_program(res)
         program.validate()
-        print "\n\n"
-        print "Restructured program"
-        print "====================\n"
-        print program
+        print("\n\n")
+        print("Restructured program")
+        print("====================\n")
+        print(program)
         program.compile()
-        print "Generated instructions"
-        print "======================\n"
+        print("Generated instructions")
+        print("======================\n")
         for i in program.instructions:
-            print i
+            print(i)
         basic_blocks = find_basic_blocks(program.instructions)
-        print "\nBasic blocks"
-        print "=============\n"
-        print basic_blocks
+        print("\nBasic blocks")
+        print("=============\n")
+        print(basic_blocks)
         cfg = bb_to_cfg(basic_blocks)
-        print "\nCFG (adjacency matrix)"
-        print "=======================\n"
+        print("\nCFG (adjacency matrix)")
+        print("=======================\n")
         print_cfg(cfg, basic_blocks)
         view_cfg(cfg, basic_blocks)
 
-        print "\nFinding dominator tree"
-        print "======================="
+        print("\nFinding dominator tree")
+        print("=======================")
         dom = find_dominators(cfg, basic_blocks)
         i = 0
         for bb in basic_blocks:
-            print bb, " Dominators :", dom[i]
+            print(bb, " Dominators :", dom[i])
             i = i + 1
 
-        print "\nFinding back edges"
-        print "==================="
+        print("\nFinding back edges")
+        print("===================")
         back_edges = find_back_edges(cfg, dom)
-        print back_edges
+        print(back_edges)
         loops = []
         for be in back_edges:
             loop = get_natural_loop(cfg, be[0], be[1])
-            print "Loop :", loop
+            print("Loop :", loop)
             loops.append(loop)
 
         i = 0
         while i < len(loops):
-            print "\nInitializing loop", i
-            print "===================="
+            print("\nInitializing loop", i)
+            print("====================")
             basic_blocks, cfg, dom, back_edges, loops = insert_preheader(cfg, basic_blocks, loops, i)
 
             #print "\nAfter Initializing preheader"
@@ -363,57 +363,57 @@ def entry_point(argv):
             #view_cfg(cfg, basic_blocks)
             i = i + 1
 
-        print "\nReaching definitions"
-        print "====================="
+        print("\nReaching definitions")
+        print("=====================")
         find_reaching_definitions(cfg, basic_blocks)
         for bb in basic_blocks:
-            print bb, "Inset : ", bb.inreachset
+            print(bb, "Inset : ", bb.inreachset)
 
-        print "\nAvailable expressions"
-        print "======================"
+        print("\nAvailable expressions")
+        print("======================")
         find_available_expressions(cfg, basic_blocks)
         for bb in basic_blocks:
-            print bb, "Avail" + str(bb.inavailset)
+            print(bb, "Avail" + str(bb.inavailset))
 
-        print "\nLive variables"
-        print "================"
+        print("\nLive variables")
+        print("================")
         find_live_variables(cfg, basic_blocks)
         for bb in basic_blocks:
             if bb.outliveset != None:
-                print bb, "LiveOut : {",
+                print(bb, "LiveOut : {", end=' ')
                 for i in bb.outliveset:
-                    print get_string(i),
-                print "}"
+                    print(get_string(i), end=' ')
+                print("}")
 
         #optimization("Copy propagation", 0, cfg, basic_blocks, lambda x : x.propagate_copy())
 
         i = 0
         while i < len(loops):
-            print "\nOptimizing loop invariants (loop:", loops[i], ")"
-            print "=============================="
+            print("\nOptimizing loop invariants (loop:", loops[i], ")")
+            print("==============================")
             basic_blocks, cfg, dom, back_edges, loops = optimize_loop_invariants(cfg, basic_blocks, dom, back_edges, loops, i)
             i = i + 1
 
-        print "\nReevaluating dataflow"
-        print "=====================\n"
+        print("\nReevaluating dataflow")
+        print("=====================\n")
         find_reaching_definitions(cfg, basic_blocks)
         find_available_expressions(cfg, basic_blocks)
         find_live_variables(cfg, basic_blocks)
 
         i = 0
         while i < len(loops):
-            print "\nSearching for induction variables (loop:", loops[i], ")"
-            print "==================================="
+            print("\nSearching for induction variables (loop:", loops[i], ")")
+            print("===================================")
             var = []
             lp = []
             for bi in loops[i]:
                 lp.append(basic_blocks[bi])
             for bi in loops[i]:
                 var.append(basic_blocks[bi].find_induction_variables(lp))
-            print "Induction variables :", #var,
+            print("Induction variables :", end=' ') #var,
             for v in var:
                 for w in v:
-                    print get_string(w[0]),
+                    print(get_string(w[0]), end=' ')
             i = i + 1
 
         optimization("Common Subexpression Elimination", 1, cfg, basic_blocks, lambda x : x.eliminate_cse())
@@ -426,38 +426,38 @@ def entry_point(argv):
         # What is the correct order of optimization then?
         #optimization("Common Subexpression Elimination", 4, cfg, basic_blocks, lambda x : x.eliminate_cse())
 
-        print "\nReaching definitions"
-        print "====================="
+        print("\nReaching definitions")
+        print("=====================")
         find_reaching_definitions(cfg, basic_blocks)
         for bb in basic_blocks:
-            print bb, "Inset : ", bb.inreachset
+            print(bb, "Inset : ", bb.inreachset)
 
-        print "\nAvailable expressions"
-        print "======================"
+        print("\nAvailable expressions")
+        print("======================")
         find_available_expressions(cfg, basic_blocks)
         for bb in basic_blocks:
-            print bb, "Avail" + str(bb.inavailset)
+            print(bb, "Avail" + str(bb.inavailset))
 
-        print "\nLive variables"
-        print "================"
+        print("\nLive variables")
+        print("================")
         find_live_variables(cfg, basic_blocks)
         for bb in basic_blocks:
             if bb.outliveset != None:
-                print bb, "LiveOut : {",
+                print(bb, "LiveOut : {", end=' ')
                 for i in bb.outliveset:
-                    print get_string(i),
-                print "}"
+                    print(get_string(i), end=' ')
+                print("}")
 
-        print "\nAfter eliminating dead code"
-        print "============================\n"
+        print("\nAfter eliminating dead code")
+        print("============================\n")
 
         basic_blocks, cfg, dom, back_edges, loops = eliminate_dead_code(basic_blocks, cfg, dom, back_edges, loops)
 
         print_cfg(cfg, basic_blocks)
         view_cfg(cfg, basic_blocks)
 
-        print "\nAfter eliminating dead blocks"
-        print "==============================\n"
+        print("\nAfter eliminating dead blocks")
+        print("==============================\n")
 
         basic_blocks, cfg, dom, back_edges, loops = eliminate_dead_blocks(basic_blocks, cfg, dom, back_edges, loops)
 
@@ -467,7 +467,7 @@ def entry_point(argv):
     except RuntimeError as e:
         disp("\n\n")
         disp(e.nice_error_message(f.name, source))
-    print "\nExecution completed!"
+    print("\nExecution completed!")
     return 0
 
 def target(driver, args):

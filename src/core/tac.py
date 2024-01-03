@@ -66,7 +66,7 @@ class Atom(object):
     # Returns true if the expression
     # contains the variable
     def contains(self, sid):
-        print "Override this"
+        print("Override this")
 
     # inreachset is the set of reaching definitions
     # loop is the set of basic blocks comprising
@@ -86,7 +86,7 @@ class Atom(object):
 
     # Returns the set of used variables in the expression
     def get_used(self):
-        print "Override this"
+        print("Override this")
 
 class Var(Atom):
 
@@ -162,7 +162,7 @@ class Var(Atom):
         ret = True
         count = 0
         inloop = False
-        print get_string(self.sid), "->", #inreachset,
+        print(get_string(self.sid), "->", end=' ') #inreachset,
         defs = []
         for vardef in inreachset: # For every reaching definition
             if vardef.lhs == self: # Definition of present variable
@@ -170,29 +170,29 @@ class Var(Atom):
                 count = count + 1
 
         for vardef in defs:
-            print vardef,
+            print(vardef, end=' ')
             for block in loop: # Search for it in the loop block
                 if vardef in block.instructions: # There is a definition of the variable inside the loop
-                    print "[in loop]",
+                    print("[in loop]", end=' ')
                     inloop = True
                     #print "Declared", get_string(self.sid), " in loop, count :", count
                     if count > 1: # There is more than one definition of it
                         self.last_loop_variancy[id(loop)] = False
-                        print "False [more than one definition and inside loop]"
+                        print("False [more than one definition and inside loop]")
                         return False
                     ret = ret and vardef.rhs.is_loop_invariant(inreachset, loop)
                     break # go for the next one
             if not inloop:
-                print "[not in loop]",
+                print("[not in loop]", end=' ')
         if not inloop: # The variable was not defined inside the loop, it is invariant
-            print "True [defined outside of the loop]"
+            print("True [defined outside of the loop]")
             self.last_loop_variancy[id(loop)] = True
             return True
         elif inloop and count == 1: # It is defined in the loop and that is the only definition
-            print ret, "[defined inside the loop and is only definition]"
+            print(ret, "[defined inside the loop and is only definition]")
             self.last_loop_variancy[id(loop)] = ret
             return ret
-        print "False [nothing holds]"
+        print("False [nothing holds]")
         self.last_loop_variancy[id(loop)] = False
         return False # None of them holds
 
@@ -444,7 +444,7 @@ class BinOp(AtomicOp):
 
     def is_loop_invariant(self, inreachset, loop):
         res, found = Atom.is_loop_invariant(self, inreachset, loop)
-        print res, found
+        print(res, found)
         if found:
             return res
 
@@ -604,7 +604,7 @@ class Tac(object):
 
     def is_loop_invariant(self, inreachset, loop):
         if self.lhs is not None and self.rhs is not None:
-            print "From tac :", self #, inreachset
+            print("From tac :", self) #, inreachset
             return self.lhs.is_loop_invariant(inreachset, loop) #and self.rhs.is_loop_invariant(inreachset, loop)
             #return self.last_invariancy_status
         return False

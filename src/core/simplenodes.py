@@ -182,7 +182,7 @@ class AssignmentStatement(Statement):
 
     def compile(self):
         s = Var(self.assignee.sid)
-        print self.assignment.__class__
+        print(self.assignment.__class__)
         t = self.assignment.compile(True) # dontassign = True
         tac = Tac()
         tac.lhs = s

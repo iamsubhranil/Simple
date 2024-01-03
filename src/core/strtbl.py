@@ -11,7 +11,7 @@ strtable = StringTable()
 def register_string(string):
     assert isinstance(string, str)
     global strtable
-    hval = md5(string).hexdigest()
+    hval = md5(string.encode("utf-8")).hexdigest()
     if hval not in strtable.stringtable:
         strtable.stringtable[hval] = string
         s = len(strtable.stringhashlist)

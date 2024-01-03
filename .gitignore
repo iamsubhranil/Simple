@@ -3,3 +3,5 @@ simple/
 .gdb_history
 concept.md
 simple-c
+*.bak
+.venv/

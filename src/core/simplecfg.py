@@ -1,6 +1,6 @@
 from tac import Tac
 from simplenodes import get_temp_label
-from Queue import *
+from queue import *
 
 def find_index(instructions):
     def fi(ins):
@@ -12,7 +12,7 @@ def find_basic_blocks(instructions):
     # form a basic block
     basic_blocks = []
 
-    print instructions
+    print(instructions)
 
     leaders = [instructions[0]]
     i = 1
@@ -30,9 +30,9 @@ def find_basic_blocks(instructions):
     #instrs = instructions
     leaders.sort(key=lambda x: instructions.index(x))
 
-    print "\nLeaders"
-    print "========\n"
-    print leaders, "\n"
+    print("\nLeaders")
+    print("========\n")
+    print(leaders, "\n")
 
     worklist = list(leaders)
     worklist.reverse()
@@ -101,20 +101,20 @@ def bb_to_cfg(basic_blocks):
     return cfg
 
 def print_cfg(cfg, basic_blocks):
-    print " " * 4,
+    print(" " * 4, end=' ')
     for i in range(len(basic_blocks)):
-        print "%-4d" % i,
-    print
+        print("%-4d" % i, end=' ')
+    print()
     k = 0
     for i in cfg:
-        print "%-4d" % k,
+        print("%-4d" % k, end=' ')
         for j in i:
             if j == 'None':
                 j = '--'
             elif j == ' ' or j == 'else':
                 j = '->'
-            print "%-4s" % j,
-        print "\n"
+            print("%-4s" % j, end=' ')
+        print("\n")
         k = k + 1
 
 def view_cfg(cfg, basic_blocks, name = "CFG"):
@@ -322,7 +322,7 @@ def get_natural_loop(cfg, m, n):
     #return loop
     """
     # The back edge is from n -> m
-    print m, n
+    print(m, n)
     loop = []
     lc = len(cfg)
     reachmat = [None] * lc # Reachability matrix
@@ -355,10 +355,10 @@ def get_natural_loop(cfg, m, n):
     for row in reachmat:
         for i in row:
             if i:
-                print 1,
+                print(1, end=' ')
             else:
-                print 0,
-        print
+                print(0, end=' ')
+        print()
 
     loop.append(m)
     i = 0
@@ -367,7 +367,7 @@ def get_natural_loop(cfg, m, n):
             loop.append(i)
         i = i + 1
     loop.append(n)
-    print loop
+    print(loop)
     return loop
 
 def insert_preheader(cfg, basic_blocks, loops, idx):
@@ -432,7 +432,7 @@ def insert_preheader(cfg, basic_blocks, loops, idx):
     loops = []
     for be in back_edges:
         loops.append(get_natural_loop(cfg, be[0], be[1]))
-    print "New loops :", loops
+    print("New loops :", loops)
 
     # Return everything
     return (basic_blocks, cfg, dom, back_edges, loops)
@@ -472,7 +472,7 @@ def eliminate_dead_blocks(basic_blocks, cfg, dom, back_edges, loops):
     removable = []
     for bb in basic_blocks:
         if not bb.reachable:
-            print bb, "is not reachable"
+            print(bb, "is not reachable")
             removable.append(bb)
     if len(removable) > 0:
         return remove_blocks(removable, basic_blocks)
@@ -531,7 +531,7 @@ def optimize_loop_invariants(cfg, basic_blocks, dom, back_edges, loops, idx):
         for iv in inv:
             loop_invariants.append((iv, i))
 
-    print loop_invariants
+    print(loop_invariants)
 
     exit = loops[idx][-1]
     removeblocks = []
@@ -556,19 +556,19 @@ def optimize_loop_invariants(cfg, basic_blocks, dom, back_edges, loops, idx):
             preheader.append_ins(inv)
     if len(removeblocks) > 0:
         basic_blocks, cfg, dom, back_edges, loops = remove_blocks(removeblocks, basic_blocks)
-        print "New loops :", loops
+        print("New loops :", loops)
 
     if changed:
         # Refind reaching definitions, available expressions
         # and liveness information
-        print "Invariant statement(s) moved!"
-        print "Recalculating reaching definitions"
+        print("Invariant statement(s) moved!")
+        print("Recalculating reaching definitions")
         find_reaching_definitions(cfg, basic_blocks)
-        print "Recalculating available expressions"
+        print("Recalculating available expressions")
         find_available_expressions(cfg, basic_blocks)
-        print "Recalculating live variables"
+        print("Recalculating live variables")
         find_live_variables(cfg, basic_blocks)
-        print basic_blocks
+        print(basic_blocks)
         print_cfg(cfg, basic_blocks)
         view_cfg(cfg, basic_blocks)
 
@@ -666,7 +666,7 @@ class BasicBlock(object):
 
     def fold_constants(self):
         for i in self.instructions:
-            print i
+            print(i)
             i.fold_constants(self.insreachset[i])
 
     def propagate_copy(self):
@@ -693,7 +693,7 @@ class BasicBlock(object):
 
     def eliminate_cse(self):
         for i in self.instructions:
-            print i, self.insavailset[i]
+            print(i, self.insavailset[i])
             i.eliminate_cse(self.insavailset[i])
 
     def find_loop_invariants(self, loop):
